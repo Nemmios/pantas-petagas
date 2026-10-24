@@ -5,11 +5,13 @@
   --merah: #c0392b; --merah-lembut: #fbe9e7; --hijau: #1e8449; --hijau-lembut: #e6f4ea;
   --oren: #b9770e; --oren-lembut: #fdf2e0; --biru-muda: #2563a8; --biru-lembut: #e7eff9;
   --jejari: 14px; --bayang: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --viz-1: #2a78d6; --viz-2: #eb6834; --viz-grid: #e6e8ec;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --latar: #0f141c; --kad: #182130; --teks: #e8ecf2; --teks-2: #9aa5b5; --garis: #2a3547;
     --emas-lembut: #3a3016; --merah-lembut: #3b1d1a; --hijau-lembut: #16301f; --oren-lembut: #3a2a12; --biru-lembut: #172a42;
+    --viz-1: #3987e5; --viz-2: #d95926; --viz-grid: #263246;
   }
 }
 * { box-sizing: border-box; }
@@ -203,6 +205,17 @@ table.lm-murid th:last-child, table.lm-murid td:last-child { width: 10%; }
 .lm-klik { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .lm-belum, .lm-akan { color: var(--teks-2); }
 .lm-cuti { color: var(--teks-2); font-style: italic; }
+/* carta */
+.c-tip { position: absolute; top: 4px; min-width: 150px; background: var(--kad); border: 1px solid var(--garis); border-radius: 10px;
+  padding: 7px 10px; font-size: 12.5px; box-shadow: var(--bayang); pointer-events: none; }
+.c-bar { display: grid; grid-template-columns: minmax(90px, 38%) 1fr auto; gap: 8px; align-items: center; padding: 5px 0; font-size: 13px; }
+.c-bar-label { overflow-wrap: anywhere; }
+.c-bar-trek { height: 12px; background: var(--latar); border-radius: 0 4px 4px 0; overflow: hidden; }
+.c-bar-trek span { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.c-bar-nilai { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.c-bar-nilai small { color: var(--teks-2); }
+.legenda { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--teks-2); margin: 0 0 6px; }
+.legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
 /* dialog */
 .tirai { position: fixed; inset: 0; background: rgba(10, 15, 25, .6); z-index: 40; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
 .tirai .dialog { width: 100%; max-width: 420px; margin: 0; }

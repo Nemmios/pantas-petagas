@@ -125,6 +125,36 @@
     <div id="pLaporan" class="tersembunyi">
       <div class="statistik" id="statLaporan"></div>
       <div class="kad">
+        <h2>Trend kehadiran harian</h2>
+        <p class="nota" id="notaTrend">Peratus kehadiran setiap hari persekolahan. Garis putus-putus = sasaran 95%.</p>
+        <div class="legenda" id="legendaTrend"></div>
+        <div id="grafTrend"></div>
+      </div>
+      <div class="kad">
+        <h2>Murid dalam pemantauan</h2>
+        <p class="nota">Bulan ini: kehadiran bawah 90%, tanpa sebab 3 hari atau lebih, ponteng kelas 3 kali atau lebih, atau lewat 5 kali atau lebih.</p>
+        <div class="ringkasan" id="ringkasPantau"></div>
+        <div class="jadual-bungkus"><table class="kad-mobile">
+          <thead><tr><th>Murid</th><th>Kelas</th><th class="angka">% hadir</th><th>Sebab dipantau</th><th class="angka">Susulan</th></tr></thead>
+          <tbody id="jPantau"></tbody></table></div>
+      </div>
+      <div class="kad">
+        <h2>Sebab tidak hadir</h2>
+        <p class="nota">Hari tidak hadir bulan ini ikut kategori idMe. ⚠ = perlu tindakan.</p>
+        <div id="grafSebab"></div>
+      </div>
+      <div class="kad">
+        <h2>Kehadiran ikut tingkatan</h2>
+        <div class="jadual-bungkus"><table>
+          <thead><tr><th>Kumpulan</th><th class="angka">Kelas</th><th class="angka">Murid</th><th class="angka">TH</th><th class="angka">% hadir</th></tr></thead>
+          <tbody id="jTingkatan"></tbody></table></div>
+      </div>
+      <div class="kad">
+        <h2>Kedudukan kelas</h2>
+        <p class="nota">Terendah di atas. Hijau ≥ 95%, oren 90–95%, merah &lt; 90%. Garis putus-putus = 90% dan 95%.</p>
+        <div id="grafKelas"></div>
+      </div>
+      <div class="kad">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <div><h2 id="tajukLaporan">Laporan kehadiran bulanan</h2>
             <p class="nota" style="margin:0">Peratus kehadiran = 1 − (hari tidak hadir ÷ (enrolmen × hari ditanda)).</p></div>
@@ -183,6 +213,7 @@
 
 <script src="pantas.js"></script>
 <script src="surat.js"></script>
+<script src="carta.js"></script>
 <script>
 (() => {
   const P = PANTAS, $ = s => document.querySelector(s);
@@ -283,14 +314,19 @@
     $("#tajukLaporan").textContent = `Laporan kehadiran ${NAMA_BULAN[m - 1]} ${y}`;
     $("#jLapKelas").innerHTML = `<tr><td colspan="8" class="muat">Memuatkan…</td></tr>`;
     try {
-      const [k, mu] = await Promise.all([P.db.rpcSemua("laporan_bulanan_kelas", { p_bulan: tarikh }), P.db.rpcSemua("laporan_bulanan_murid", { p_bulan: tarikh })]);
+      const lepas = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);
+      const [k, mu, harian, sebab, kLepas] = await Promise.all([P.db.rpcSemua("laporan_bulanan_kelas", { p_bulan: tarikh }), P.db.rpcSemua("laporan_bulanan_murid", { p_bulan: tarikh }),
+        P.db.rpcSemua("laporan_harian", { p_bulan: tarikh }).catch(() => []), P.db.rpcSemua("laporan_sebab", { p_bulan: tarikh }).catch(() => []),
+        P.db.rpcSemua("laporan_bulanan_kelas", { p_bulan: lepas }).catch(() => [])]);
       const sesi = $("#sesi").value;
       lapKelas = k.filter(x => !sesi || x.sesi === sesi); lapMurid = mu.filter(x => !sesi || x.sesi === sesi);
       const jum = f => lapKelas.reduce((a, x) => a + (x[f] || 0), 0);
-      const hariMurid = lapKelas.reduce((a, x) => a + x.enrolmen * x.hari_ditanda, 0);
-      const purata = hariMurid ? (100 * (1 - jum("tidak_hadir") / hariMurid)).toFixed(1) : "—";
+      const peratusDari = rows => { const hm = rows.reduce((a, x) => a + x.enrolmen * x.hari_ditanda, 0); return hm ? 100 * (1 - rows.reduce((a, x) => a + x.tidak_hadir, 0) / hm) : null; };
+      const pKini = peratusDari(lapKelas), pLepas = peratusDari(kLepas.filter(x => !sesi || x.sesi === sesi));
+      const purata = pKini == null ? "—" : pKini.toFixed(1);
+      const beza = pKini != null && pLepas != null ? pKini - pLepas : null;
       $("#statLaporan").innerHTML = `
-        <div class="stat hijau"><b>${purata}${purata === "—" ? "" : "%"}</b><span>Purata kehadiran</span></div>
+        <div class="stat hijau"><b>${purata}${purata === "—" ? "" : "%"}</b><span>Purata kehadiran${beza == null ? "" : `<br><small style="color:${beza >= 0 ? "var(--hijau)" : "var(--merah)"}">${beza >= 0 ? "▲" : "▼"} ${Math.abs(beza).toFixed(1)} berbanding ${NAMA_BULAN[(m + 10) % 12]}</small>`}</span></div>
         <div class="stat"><b>${lapKelas.filter(x => x.hari_ditanda > 0).length}/${lapKelas.length}</b><span>Kelas ada rekod</span></div>
         <div class="stat merah"><b>${jum("tidak_hadir")}</b><span>Hari tidak hadir</span></div>
         <div class="stat merah"><b>${jum("tanpa_sebab")}</b><span>Tanpa sebab</span></div>
@@ -307,7 +343,69 @@
         <td class="angka" data-label="TH">${x.tidak_hadir}</td><td class="angka" data-label="Tanpa sebab">${x.tanpa_sebab ? `<b style="color:var(--merah)">${x.tanpa_sebab}</b>` : 0}</td>
         <td class="angka" data-label="Lewat">${x.lewat}</td><td class="angka" data-label="Ponteng kelas">${x.ponteng_kelas}</td></tr>`).join("")
         : `<tr><td colspan="6" class="muat">Tiada rekod bagi bulan ini.</td></tr>`;
+      lukisLaporanTerperinci({ harian, sebab, sesi, y, m });
     } catch (e) { ralat("#jLapKelas", e, 8); }
+  }
+
+  // ---------- laporan terperinci: trend, pemantauan, sebab, tingkatan, kedudukan ----------
+  async function lukisLaporanTerperinci({ harian, sebab, sesi, y, m }) {
+    // 1. trend harian
+    const tarikhList = [...new Set(harian.map(r => r.tarikh))].sort();
+    const siriSesi = sesi ? [sesi] : ["PAGI", "PETANG"].filter(s => harian.some(r => r.sesi === s));
+    const WARNA = { PAGI: "var(--viz-1)", PETANG: "var(--viz-2)" };
+    const siri = siriSesi.map(s => ({ nama: s === "PAGI" ? "Pagi" : "Petang", warna: WARNA[s],
+      nilai: tarikhList.map(t => { const r = harian.find(x => x.tarikh === t && x.sesi === s); return r && r.enrolmen_ditanda ? 100 * (1 - r.tidak_hadir / r.enrolmen_ditanda) : null; }),
+      th: tarikhList.map(t => { const r = harian.find(x => x.tarikh === t && x.sesi === s); return r ? r.tidak_hadir : 0; }) }));
+    $("#legendaTrend").innerHTML = siri.length > 1 ? siri.map(s => `<span><i style="background:${s.warna}"></i>Sesi ${s.nama}</span>`).join("") : "";
+    CARTA.trend($("#grafTrend"), { label: tarikhList.map(t => String(+t.slice(8, 10))), tarikh: tarikhList.map(t => P.tarikhCantik(t, true)), siri, sasaran: 95 });
+
+    // 2. murid dalam pemantauan
+    const hariKelas = {}; lapKelas.forEach(k => (hariKelas[k.kelas] = { hari: k.hari_ditanda, guru: k.guru_kelas }));
+    const pantau = lapMurid.map(x => {
+      const hari = (hariKelas[x.kelas] || {}).hari || 0, pct = hari >= 3 ? 100 * (1 - x.tidak_hadir / hari) : null, sebabP = [];
+      if (pct != null && pct < 90) sebabP.push(`<span class="cip th">Kehadiran &lt; 90%</span>`);
+      if (x.tanpa_sebab >= 3) sebabP.push(`<span class="cip th">Tanpa sebab ${x.tanpa_sebab}</span>`);
+      if (x.ponteng_kelas >= 3) sebabP.push(`<span class="cip lw">Ponteng kelas ${x.ponteng_kelas}</span>`);
+      if (x.lewat >= 5) sebabP.push(`<span class="cip lw">Lewat ${x.lewat}</span>`);
+      return { ...x, pct, sebabP, guru: (hariKelas[x.kelas] || {}).guru };
+    }).filter(x => x.sebabP.length).sort((a, b) => b.sebabP.length - a.sebabP.length || b.tanpa_sebab - a.tanpa_sebab || (a.pct ?? 100) - (b.pct ?? 100));
+    let susulan = {};
+    if (pantau.length) {
+      const mula = `${y}-${String(m).padStart(2, "0")}-01`, akhir = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+      const ids = pantau.map(x => `"${x.murid_id}"`).join(",");
+      try { (await P.db.pilih("tindakan_susulan", `select=murid_id&murid_id=in.(${ids})&tarikh=gte.${mula}&tarikh=lte.${akhir}`)).forEach(r => (susulan[r.murid_id] = (susulan[r.murid_id] || 0) + 1)); } catch {}
+    }
+    const tanpaSusulan = pantau.filter(x => !susulan[x.murid_id]).length;
+    $("#ringkasPantau").innerHTML = `<span class="cip">${pantau.length} murid</span>${pantau.length ? `<span class="cip ${tanpaSusulan ? "th" : "ok"}">${tanpaSusulan} belum ada susulan</span>` : ""}`;
+    const HAD = $("#jPantau").dataset.semua === "1" ? 300 : 15;
+    $("#jPantau").innerHTML = (pantau.length ? pantau.slice(0, HAD).map(x => `<tr>
+      <td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid)}</b></td>
+      <td data-label="Kelas">${P.esc(x.kelas)}<br><small style="color:var(--teks-2)">${P.esc(P.namaPendek(x.guru || ""))}</small></td>
+      <td class="angka" data-label="% hadir">${x.pct == null ? "—" : `<b style="color:${CARTA.warnaPeratus(x.pct)}">${x.pct.toFixed(1)}%</b>`}</td>
+      <td data-label="Dipantau"><span style="display:flex;gap:4px;flex-wrap:wrap">${x.sebabP.join("")}</span></td>
+      <td class="angka" data-label="Susulan">${susulan[x.murid_id] ? susulan[x.murid_id] : `<span style="color:var(--merah)">0</span>`}</td></tr>`).join("")
+      : `<tr><td colspan="5" class="muat">Tiada murid memenuhi kriteria pemantauan bulan ini.</td></tr>`)
+      + (pantau.length > HAD ? `<tr><td colspan="5" class="muat">Menunjukkan ${HAD} teratas daripada ${pantau.length} murid.
+        ${HAD < 300 ? `<button type="button" class="btn garis kecil" id="bPantauSemua" style="margin-left:6px">Tunjuk lagi</button>` : "Senarai penuh: butang CSV murid."}</td></tr>` : "");
+    const bS = $("#bPantauSemua"); if (bS) bS.addEventListener("click", () => { $("#jPantau").dataset.semua = "1"; lukisLaporanTerperinci({ harian, sebab, sesi, y, m }); });
+
+    // 3. sebab tidak hadir
+    const kiraSebab = {}; sebab.filter(r => !sesi || r.sesi === sesi).forEach(r => (kiraSebab[r.kategori] = (kiraSebab[r.kategori] || 0) + r.bil));
+    CARTA.pecahan($("#grafSebab"), Object.entries(kiraSebab).map(([kategori, bil]) => ({ kategori, bil })).sort((a, b) => b.bil - a.bil), huruf);
+
+    // 4. ikut tingkatan
+    const kumpulan = n => (/^\d/.test(n) ? `Tingkatan ${n[0]}` : /PRA/i.test(n) ? "Prasekolah" : "PPKI");
+    const tk = {};
+    lapKelas.forEach(k => { const g = kumpulan(k.kelas); tk[g] = tk[g] || { kelas: 0, murid: 0, th: 0, hm: 0 };
+      tk[g].kelas++; tk[g].murid += k.enrolmen; tk[g].th += k.tidak_hadir; tk[g].hm += k.enrolmen * k.hari_ditanda; });
+    $("#jTingkatan").innerHTML = Object.entries(tk).sort((a, b) => (a[0].startsWith("T") ? 0 : 1) - (b[0].startsWith("T") ? 0 : 1) || a[0].localeCompare(b[0])).map(([g, v]) => {
+      const p = v.hm ? 100 * (1 - v.th / v.hm) : null;
+      return `<tr><td data-label="Kumpulan" style="white-space:nowrap"><b>${g}</b></td><td class="angka" data-label="Kelas">${v.kelas}</td><td class="angka" data-label="Murid">${v.murid}</td>
+        <td class="angka" data-label="TH">${v.th}</td><td class="angka" data-label="% hadir">${p == null ? "—" : `<b style="color:${CARTA.warnaPeratus(p)}">${p.toFixed(1)}%</b>`}</td></tr>`;
+    }).join("") || `<tr><td colspan="5" class="muat">Tiada data.</td></tr>`;
+
+    // 5. kedudukan kelas
+    CARTA.kedudukan($("#grafKelas"), lapKelas.map(k => ({ kelas: k.kelas, peratus: k.peratus_hadir == null ? null : +k.peratus_hadir, guru: P.namaPendek(k.guru_kelas || ""), th: k.tidak_hadir, hari: k.hari_ditanda })));
   }
   $("#bCsvKelas").addEventListener("click", () => {
     if (!lapKelas.length) return P.toast("Tiada data", "ralat");
