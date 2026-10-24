@@ -95,7 +95,8 @@
     <div id="pKelasku" class="tersembunyi">
       <div class="kad">
         <h2 id="tajukKelasku">Kelas saya</h2>
-        <p class="nota">Murid tidak hadir dalam 14 hari lepas yang perlu tindakan guru kelas.</p>
+        <p class="nota">Murid tidak hadir dalam 14 hari lepas yang perlu tindakan guru kelas. Tekan nama murid untuk lihat profil penuh.</p>
+        <a class="btn garis kecil" href="murid.html" style="margin-bottom:10px">👤 Profil murid kelas saya</a>
         <div class="ringkasan" id="ringkasKelasku"></div>
         <div id="senaraiKelasku" class="muat">Memuatkan…</div>
       </div>
@@ -427,16 +428,16 @@
           return `<a class="btn wa kecil wa-log" data-hub="${P.esc(p.hubungan || "penjaga")}" target="_blank" rel="noopener" href="https://wa.me/${P.telWa(p.telefon)}?text=${encodeURIComponent(t)}">WhatsApp ${P.esc(huruf(p.hubungan || "penjaga"))}</a>`;
         }).join(" ") || `<span class="cip">Tiada no. telefon</span>`;
         return `<div class="murid" style="flex-wrap:wrap" data-id="${P.esc(r.murid_id)}" data-tarikh="${r.tarikh}">
-          <span class="nama"><b>${P.esc(r.murid)}</b><small style="color:var(--teks-2)">${P.tarikhCantik(r.tarikh, true)}${r.catatan ? " · " + P.esc(r.catatan) : ""}</small></span>
+          <span class="nama"><b>${P.pautMurid(r.murid_id, r.murid)}</b><small style="color:var(--teks-2)">${P.tarikhCantik(r.tarikh, true)}${r.catatan ? " · " + P.esc(r.catatan) : ""}</small></span>
           ${label}
           <div style="width:100%;display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${wa}<button class="btn garis kecil b-panggil">📞 Rekod panggilan</button><button class="btn garis kecil b-rekod">Rekod sebab</button></div>
           <div class="borang-panggil tersembunyi" style="width:100%"><label>Catatan panggilan</label><input class="p-cat" maxlength="300" placeholder="cth Ibu kata anak demam, akan hantar MC">
             <button class="btn utama kecil p-simpan" style="margin-top:8px">Simpan rekod panggilan</button></div>
           <div class="borang-rekod tersembunyi" style="width:100%"></div></div>`;
       }).join("") : `<div class="mesej ok">Tiada murid yang perlu tindakan. 👍</div>`;
-      const pk = await P.db.pilih("ponteng_kelas", `select=tarikh,waktu,subjek,status,murid!inner(nama,kelas_id)&murid.kelas_id=eq.${k.id}&tarikh=gte.${dari}&order=tarikh.desc,waktu`);
+      const pk = await P.db.pilih("ponteng_kelas", `select=tarikh,waktu,subjek,status,murid_id,murid!inner(nama,kelas_id)&murid.kelas_id=eq.${k.id}&tarikh=gte.${dari}&order=tarikh.desc,waktu`);
       $("#pontengKelasku").className = "";
-      $("#pontengKelasku").innerHTML = pk.length ? pk.map(x => `<div class="murid"><span class="nama"><b>${P.esc(x.murid.nama)}</b>
+      $("#pontengKelasku").innerHTML = pk.length ? pk.map(x => `<div class="murid"><span class="nama"><b>${P.pautMurid(x.murid_id, x.murid.nama)}</b>
         <small style="color:var(--teks-2)">${P.tarikhCantik(x.tarikh, true)} · ${P.esc(x.waktu)} · ${P.esc(x.subjek)}</small></span>${labelPk(x.status)}</div>`).join("")
         : `<div class="muat">Tiada laporan ponteng kelas.</div>`;
       $("#tidakSepadan").className = "";

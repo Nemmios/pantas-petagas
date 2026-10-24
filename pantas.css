@@ -168,6 +168,23 @@ td select { min-width: 140px; padding: 8px 10px; }
   table.kad-mobile td[data-label=""]::before { content: none; }
   table.kad-mobile td.angka { text-align: left; }
 }
+a.pautan-murid { color: inherit; text-decoration: underline; text-decoration-color: var(--emas); text-underline-offset: 3px; }
+/* profil murid */
+.profil-kepala { display: flex; gap: 14px; align-items: center; }
+.profil-kepala .avatar { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: var(--emas-lembut); color: var(--emas); font-weight: 700; font-size: 20px; }
+.profil-kepala h2 { margin: 0; font-size: 18px; }
+.medan { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 16px; margin-top: 14px; }
+.medan div small { display: block; color: var(--teks-2); font-size: 12.5px; font-weight: 600; }
+.medan div span { font-size: 14.5px; overflow-wrap: anywhere; }
+.bulan-jalur { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 6px; }
+.bulan-jalur div { border: 1px solid var(--garis); border-radius: 10px; padding: 6px 8px; font-size: 12px; color: var(--teks-2); }
+.bulan-jalur div b { display: block; font-size: 15px; color: var(--teks); }
+.bulan-jalur div.ada { border-color: var(--merah); }
+.bulan-jalur div.ada b { color: var(--merah); }
+.hasil-cari a { display: flex; justify-content: space-between; gap: 10px; padding: 11px 4px; border-bottom: 1px solid var(--garis);
+  color: var(--teks); text-decoration: none; font-size: 14.5px; }
+.hasil-cari a small { color: var(--teks-2); white-space: nowrap; }
 @media print {
   .kepala button, .kepala .anak-panah, .tab, .alat, .tiada-cetak, #toast { display: none !important; }
   .kepala { position: static; background: #fff; color: #000; border-bottom: 2px solid #000; }

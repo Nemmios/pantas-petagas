@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profil Murid · PANTAS</title>
+<meta name="theme-color" content="#1a2433">
+<link rel="icon" href="logo-petagas.png">
+<link rel="stylesheet" href="pantas.css">
+</head>
+<body>
+<header class="kepala">
+  <a class="ke-utama" href="./" aria-label="Kembali ke halaman utama PANTAS Petagas"><span class="anak-panah">‹</span><img src="logo-petagas.png" alt="">
+  <div class="tajuk"><b>Profil Murid</b><small id="siapa">SMK Petagas</small></div></a>
+  <button id="bKeluar" class="tersembunyi">Keluar</button>
+</header>
+
+<main class="lebar">
+  <section id="vMasuk" class="kad tersembunyi" style="max-width:460px;margin:0 auto">
+    <h2>Log masuk</h2>
+    <p class="nota">Guna akaun yang sama seperti PANTAS Guru.</p>
+    <form id="fMasuk">
+      <label for="emel">E-mel</label><input id="emel" type="email" autocomplete="username" required>
+      <label for="kata">Kata laluan</label><input id="kata" type="password" autocomplete="current-password" required>
+      <div id="mMasuk"></div>
+      <button class="btn utama penuh" id="bMasuk">Log masuk</button>
+    </form>
+  </section>
+
+  <section id="vTiada" class="kad tersembunyi">
+    <h2>Akses terhad</h2>
+    <p class="nota">Profil murid hanya untuk guru kelas, HEM, petugas dan pentadbir.</p>
+    <a class="btn utama" href="guru.html">Buka PANTAS Guru</a>
+  </section>
+
+  <section id="vApp" class="tersembunyi">
+    <!-- CARIAN -->
+    <div class="kad tiada-cetak" id="kCari">
+      <h2>Cari murid</h2>
+      <div class="baris">
+        <div><label for="cari" style="margin-top:8px">Nama atau ID murid</label><input id="cari" type="search" placeholder="cth AHMAD atau 1234567" autocomplete="off"></div>
+        <div id="kKelas"><label for="cKelas" style="margin-top:8px">Kelas</label><select id="cKelas"></select></div>
+      </div>
+      <div id="hasil" class="hasil-cari" style="margin-top:8px"></div>
+    </div>
+
+    <!-- PROFIL -->
+    <div id="kProfil" class="tersembunyi" style="scroll-margin-top:84px">
+      <div class="kad">
+        <div class="profil-kepala">
+          <div class="avatar" id="pAvatar"></div>
+          <div style="flex:1;min-width:0"><h2 id="pNama"></h2><div class="ringkasan" id="pCip" style="margin:6px 0 0"></div></div>
+        </div>
+        <div class="medan" id="pMedan"></div>
+        <div class="baris tiada-cetak" style="margin-top:14px">
+          <select id="pTahun" aria-label="Tahun"></select>
+          <button class="btn garis" id="bCetak" type="button">Cetak / PDF</button>
+        </div>
+      </div>
+
+      <div class="statistik" id="pStat"></div>
+
+      <div class="kad">
+        <h2>Tidak hadir ikut bulan</h2>
+        <div class="bulan-jalur" id="pBulan"></div>
+      </div>
+
+      <div class="kad" id="kPenjaga">
+        <h2>Ibu bapa / penjaga</h2>
+        <div id="pPenjaga" class="muat">Memuatkan…</div>
+      </div>
+
+      <div class="kad">
+        <h2>Rekod tidak hadir &amp; lewat</h2>
+        <p class="nota">Sebab dipadankan daripada borang ibu bapa atau rekod guru kelas.</p>
+        <div class="jadual-bungkus"><table class="kad-mobile"><thead><tr><th>Tarikh</th><th>Status</th><th>Sebab</th><th>idMe</th></tr></thead><tbody id="pHadir"></tbody></table></div>
+      </div>
+
+      <div class="kad">
+        <h2>Sebab dihantar</h2>
+        <p class="nota">Semua sebab yang diterima (termasuk tarikh murid sebenarnya hadir).</p>
+        <div id="pSebab"></div>
+      </div>
+
+      <div class="kad">
+        <h2>Ponteng kelas</h2>
+        <div class="jadual-bungkus"><table class="kad-mobile"><thead><tr><th>Tarikh</th><th>Waktu</th><th>Subjek</th><th>Status</th><th>Dilapor oleh</th></tr></thead><tbody id="pPonteng"></tbody></table></div>
+      </div>
+
+      <div class="kad" id="kSurat">
+        <h2>Surat amaran</h2>
+        <div class="jadual-bungkus"><table class="kad-mobile"><thead><tr><th>Tarikh surat</th><th>Surat</th><th>Ruj.</th><th>Hari tidak hadir</th></tr></thead><tbody id="pSurat"></tbody></table></div>
+      </div>
+
+      <div class="kad">
+        <h2>Tindakan susulan</h2>
+        <div id="pSusulan"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="pantas.js"></script>
+<script>
+(() => {
+  const P = PANTAS, $ = s => document.querySelector(s);
+  const huruf = s => String(s || "").toLowerCase().replace(/(^|[\s(/])\S/g, c => c.toUpperCase());
+  const BULAN = ["Jan", "Feb", "Mac", "Apr", "Mei", "Jun", "Jul", "Ogo", "Sep", "Okt", "Nov", "Dis"];
+  const SURAT = { 1: "Amaran 1", 2: "Amaran 2", 3: "Amaran Terakhir" };
+  const STATUS_PK = { DILAPOR: ["Dilapor", "lw"], DIJUMPAI: ["Dijumpai", "info"], PONTENG: ["Ponteng sah", "th"], ADA_SEBAB: ["Ada sebab", "ok"] };
+  const SUSULAN = { PANGGILAN: "📞 Panggilan telefon", WHATSAPP: "💬 WhatsApp", LAMPIRAN_DITERIMA: "📎 Lampiran diterima", JUMPA_GURU_KELAS: "🤝 Jumpa guru kelas",
+    JUMPA_PK_HEM: "🤝 Jumpa PK HEM", JUMPA_PENGETUA: "🤝 Jumpa Pengetua", ZIARAH_RUMAH: "🏠 Ziarah rumah", KAUNSELING: "🗣 Kaunseling", LAIN: "📝 Lain-lain" };
+  let saya = null, semuaKelas = [], muridKini = null;
+  const pentadbir = () => ["HEM", "ADMIN"].includes(saya.peranan);
+  const bolehHubungi = () => ["GURU_KELAS", "HEM", "ADMIN"].includes(saya.peranan);
+  const tunjuk = id => ["vMasuk", "vTiada", "vApp"].forEach(x => $("#" + x).classList.toggle("tersembunyi", x !== id));
+  const kosong = (n, teks) => `<tr><td colspan="${n}" class="muat">${teks}</td></tr>`;
+
+  $("#fMasuk").addEventListener("submit", async e => {
+    e.preventDefault(); $("#bMasuk").disabled = true;
+    try { await P.auth.masuk($("#emel").value.trim(), $("#kata").value); await mula(); }
+    catch (err) { $("#mMasuk").innerHTML = `<div class="mesej ralat">${P.esc(err.message)}</div>`; }
+    finally { $("#bMasuk").disabled = false; }
+  });
+  $("#bKeluar").addEventListener("click", async () => { await P.auth.keluar(); location.reload(); });
+
+  async function mula() {
+    if (!P.auth.sesi) return tunjuk("vMasuk");
+    try { saya = await P.auth.pengguna(); } catch { await P.auth.keluar(); return tunjuk("vMasuk"); }
+    $("#bKeluar").classList.remove("tersembunyi");
+    if (!saya || !["GURU_KELAS", "HEM", "ADMIN", "PETUGAS"].includes(saya.peranan)) return tunjuk("vTiada");
+    $("#siapa").textContent = `${P.namaPendek(saya.nama)} · ${huruf(saya.peranan.replace("_", " "))}`;
+    tunjuk("vApp");
+    semuaKelas = await P.db.pilih("kelas", "select=id,nama,sesi,guru_kelas&order=nama");
+    if (saya.peranan === "GURU_KELAS") {           // guru kelas: murid kelas sendiri sahaja
+      const k = semuaKelas.find(x => x.id === saya.kelas_id);
+      $("#cKelas").innerHTML = k ? `<option value="${k.id}">${P.esc(k.nama)}</option>` : `<option value="">—</option>`;
+      $("#cKelas").disabled = true;
+    } else {
+      $("#cKelas").innerHTML = `<option value="">Semua kelas</option>` + semuaKelas.map(k => `<option value="${k.id}">${P.esc(k.nama)}</option>`).join("");
+    }
+    const thn = +P.hariIni().slice(0, 4);
+    $("#pTahun").innerHTML = [thn, thn - 1].map(t => `<option>${t}</option>`).join("");
+    const id = new URLSearchParams(location.search).get("id");
+    if (id) bukaProfil(id); else if ($("#cKelas").value) cari();
+  }
+
+  // ---------- carian ----------
+  let tCari;
+  $("#cari").addEventListener("input", () => { clearTimeout(tCari); tCari = setTimeout(cari, 350); });
+  $("#cKelas").addEventListener("change", cari);
+  async function cari() {
+    const t = $("#cari").value.toUpperCase().replace(/[^A-Z0-9'\s]/g, " ").trim(), kid = $("#cKelas").value;
+    if (!kid && t.length < 3) { $("#hasil").innerHTML = t ? `<div class="muat">Taip sekurang-kurangnya 3 huruf.</div>` : ""; return; }
+    let q = "select=id,nama,kelas_id&aktif=is.true&order=nama&limit=" + (kid ? 80 : 30);
+    if (kid) q += `&kelas_id=eq.${kid}`;
+    if (t) q += `&or=(nama.ilike.*${P.q(t.replace(/\s+/g, "*"))}*,id.ilike.*${P.q(t)}*)`;
+    try {
+      const r = await P.db.pilih("murid", q);
+      $("#hasil").innerHTML = r.length ? r.map(m => `<a href="murid.html?id=${encodeURIComponent(m.id)}" data-id="${P.esc(m.id)}">
+        <span>${P.esc(m.nama)}</span><small>${P.esc((semuaKelas.find(k => k.id === m.kelas_id) || {}).nama || "")}</small></a>`).join("")
+        : `<div class="muat">Tiada murid dijumpai.</div>`;
+      $("#hasil").querySelectorAll("a").forEach(a => a.addEventListener("click", e => {
+        e.preventDefault(); history.pushState(null, "", a.href); bukaProfil(a.dataset.id);
+      }));
+    } catch (e) { $("#hasil").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
+  }
+  window.addEventListener("popstate", () => { const id = new URLSearchParams(location.search).get("id"); if (id) bukaProfil(id); else $("#kProfil").classList.add("tersembunyi"); });
+  $("#pTahun").addEventListener("change", () => muridKini && bukaProfil(muridKini.id));
+  $("#bCetak").addEventListener("click", () => window.print());
+
+  // ---------- profil ----------
+  async function bukaProfil(id) {
+    $("#kProfil").classList.remove("tersembunyi"); $("#hasil").innerHTML = "";
+    $("#pNama").textContent = "Memuatkan…"; $("#pMedan").innerHTML = ""; $("#pCip").innerHTML = ""; $("#pStat").innerHTML = "";
+    const thn = $("#pTahun").value, dari = `${thn}-01-01`, hingga = `${thn}-12-31`;
+    const julat = (k) => `&${k}=gte.${dari}&${k}=lte.${hingga}`;
+    try {
+      const [m] = await P.db.pilih("murid", `select=id,nama,no_kp,jantina,status,aktif,alamat,kelas_id&id=eq.${P.q(id)}`);
+      if (!m) { $("#pNama").textContent = "Murid tidak dijumpai"; return; }
+      const kelas = semuaKelas.find(k => k.id === m.kelas_id) || {};
+      if (saya.peranan === "GURU_KELAS" && m.kelas_id !== saya.kelas_id) { $("#pNama").textContent = "Murid ini bukan dari kelas anda"; return; }
+      muridKini = m;
+      document.title = `${P.namaPendek(m.nama)} · Profil Murid`;
+
+      const [hadir, sebab, ponteng, susulan, selesai, surat, penjaga] = await Promise.all([
+        P.db.pilih("kehadiran", `select=tarikh,status,masa_tiba,idme_siap&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc`),
+        P.db.pilih("sebab_tidak_hadir", `select=tarikh_mula,tarikh_akhir,catatan,sumber,minta_jumpa,status,dihantar_pada,kat:idme_kategori(nama),sbb:idme_sebab(nama)&murid_id=eq.${P.q(id)}&tarikh_akhir=gte.${dari}&tarikh_mula=lte.${hingga}&order=tarikh_mula.desc`),
+        P.db.pilih("ponteng_kelas", `select=tarikh,waktu,subjek,status,catatan,pelapor:pengguna!ponteng_kelas_dilapor_oleh_fkey(nama)&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,waktu`),
+        P.db.pilih("tindakan_susulan", `select=jenis,tarikh,catatan&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,id.desc`),
+        m.kelas_id ? P.db.pilih("kelas_selesai", `select=tarikh&kelas_id=eq.${m.kelas_id}${julat("tarikh")}`) : [],
+        pentadbir() ? P.db.pilih("surat_amaran", `select=jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir&murid_id=eq.${P.q(id)}${julat("tarikh_surat")}&order=tarikh_surat.desc`) : [],
+        bolehHubungi() ? P.db.pilih("murid_penjaga", `select=penjaga(nama,hubungan,telefon,ic_4akhir)&murid_id=eq.${P.q(id)}`) : [],
+      ]);
+
+      // padan sebab bagi setiap hari tidak hadir
+      const sebabUntuk = t => sebab.find(s => s.status !== "DITOLAK" && s.tarikh_mula <= t && t <= s.tarikh_akhir);
+      const th = hadir.filter(h => h.status === "TIDAK_HADIR"), lw = hadir.filter(h => h.status === "LEWAT");
+      const tanpa = th.filter(h => { const s = sebabUntuk(h.tarikh); return !s || (s.kat && s.kat.nama === "PONTENG"); });
+      const hariDitanda = new Set(selesai.map(s => s.tarikh)).size;
+      const peratus = hariDitanda ? Math.max(0, (1 - th.length / hariDitanda) * 100) : null;
+      const pkSah = ponteng.filter(p => ["PONTENG", "DILAPOR"].includes(p.status));
+
+      // kepala
+      $("#pAvatar").textContent = (m.nama || "?").trim()[0];
+      $("#pNama").textContent = m.nama;
+      $("#pCip").innerHTML = [
+        `<span class="cip">${P.esc(kelas.nama || "Tiada kelas")}</span>`,
+        kelas.sesi ? `<span class="cip">${huruf(kelas.sesi)}</span>` : "",
+        m.aktif ? "" : `<span class="cip th">Tidak aktif</span>`,
+        m.status && m.status !== "BERSEKOLAH" ? `<span class="cip lw">${P.esc(huruf(m.status))}</span>` : "",
+      ].join("");
+      const kp = m.no_kp ? `${"•".repeat(Math.max(0, m.no_kp.length - 4))}${m.no_kp.slice(-4)}` : "—";
+      $("#pMedan").innerHTML = [
+        ["ID murid", P.esc(m.id)],
+        ["No. KP / Sijil lahir", pentadbir() && m.no_kp ? `<span id="kp">${kp}</span> <button class="btn garis kecil tiada-cetak" id="bKp" type="button" style="padding:2px 8px">Lihat</button>` : kp],
+        ["Jantina", P.esc(huruf(m.jantina || "—"))],
+        ["Guru kelas", P.esc(kelas.guru_kelas || "—")],
+        (pentadbir() || bolehHubungi()) ? ["Alamat", P.esc(m.alamat || "—")] : null,
+      ].filter(Boolean).map(([a, b]) => `<div><small>${a}</small><span>${b}</span></div>`).join("");
+      const bKp = $("#bKp"); if (bKp) bKp.addEventListener("click", () => { $("#kp").textContent = m.no_kp; bKp.remove(); });
+
+      // statistik
+      const warnaP = peratus == null ? "" : peratus >= 95 ? "hijau" : peratus >= 90 ? "oren" : "merah";
+      $("#pStat").innerHTML = `
+        <div class="stat ${warnaP}"><b>${peratus == null ? "—" : peratus.toFixed(1) + "%"}</b><span>Kehadiran (${hariDitanda} hari ditanda)</span></div>
+        <div class="stat merah"><b>${th.length}</b><span>Hari tidak hadir</span></div>
+        <div class="stat hijau"><b>${th.length - tanpa.length}</b><span>Ada sebab</span></div>
+        <div class="stat merah"><b>${tanpa.length}</b><span>Tanpa sebab / ponteng</span></div>
+        <div class="stat oren"><b>${lw.length}</b><span>Lewat</span></div>
+        <div class="stat"><b>${pkSah.length}</b><span>Ponteng kelas</span></div>
+        ${pentadbir() ? `<div class="stat"><b>${surat.length}</b><span>Surat amaran</span></div>` : ""}`;
+
+      // ikut bulan
+      const bil = Array(12).fill(0); th.forEach(h => bil[+h.tarikh.slice(5, 7) - 1]++);
+      const bulanAkhir = thn == P.hariIni().slice(0, 4) ? +P.hariIni().slice(5, 7) : 12;
+      $("#pBulan").innerHTML = BULAN.slice(0, bulanAkhir).map((b, i) => `<div class="${bil[i] ? "ada" : ""}"><b>${bil[i]}</b>${b}</div>`).join("");
+
+      // penjaga
+      $("#kPenjaga").classList.toggle("tersembunyi", !bolehHubungi());
+      const pj = penjaga.map(x => x.penjaga).filter(Boolean);
+      $("#pPenjaga").className = "";
+      $("#pPenjaga").innerHTML = pj.length ? pj.map(p => {
+        const wa = P.telWa(p.telefon);
+        return `<div class="murid"><span class="nama"><b>${P.esc(p.nama || "—")}</b>
+          <small style="color:var(--teks-2)">${P.esc(huruf(p.hubungan || "Penjaga"))}${p.telefon ? " · " + P.esc(p.telefon) : " · tiada no. telefon"}</small></span>
+          ${p.telefon ? `<span class="tiada-cetak" style="display:flex;gap:6px"><a class="btn garis kecil" href="tel:${P.esc(p.telefon)}">📞</a>
+          <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a></span>` : ""}</div>`;
+      }).join("") : `<div class="muat">Tiada maklumat penjaga.</div>`;
+
+      // rekod kehadiran
+      $("#pHadir").innerHTML = hadir.length ? hadir.map(h => {
+        const s = h.status === "TIDAK_HADIR" ? sebabUntuk(h.tarikh) : null;
+        const teksSebab = h.status === "LEWAT" ? (h.masa_tiba ? `Tiba ${h.masa_tiba.slice(0, 5)}` : "—")
+          : s ? `<b>${P.esc(s.kat ? s.kat.nama : "")}</b>${s.sbb ? " · " + P.esc(s.sbb.nama) : ""}<br><small style="color:var(--teks-2)">${s.sumber === "GURU" ? "Direkod guru" : "Ibu bapa"}${s.catatan ? " · " + P.esc(s.catatan) : ""}</small>`
+          : `<span class="cip th">Belum ada sebab</span>`;
+        return `<tr><td data-label="Tarikh">${P.tarikhCantik(h.tarikh, true)}</td>
+          <td data-label="Status">${h.status === "LEWAT" ? `<span class="cip lw">Lewat</span>` : `<span class="cip th">Tidak hadir</span>`}</td>
+          <td data-label="Sebab"><span>${teksSebab}</span></td>
+          <td data-label="idMe">${h.status === "LEWAT" ? "—" : h.idme_siap ? `<span class="cip ok">Siap</span>` : `<span class="cip">Belum</span>`}</td></tr>`;
+      }).join("") : kosong(4, "Tiada rekod tidak hadir atau lewat. 👍");
+
+      // sebab dihantar
+      const thSet = new Set(th.map(h => h.tarikh));
+      $("#pSebab").innerHTML = sebab.length ? sebab.map(s => {
+        const hari = []; for (let t = s.tarikh_mula; t <= s.tarikh_akhir; t = P.tambahHari(t, 1)) hari.push(t);
+        const hadirJuga = hari.filter(t => !thSet.has(t) && new Date(t + "T00:00:00Z").getUTCDay() % 6 !== 0 && t <= P.hariIni());
+        const julatT = s.tarikh_mula === s.tarikh_akhir ? P.tarikhCantik(s.tarikh_mula) : `${P.tarikhCantik(s.tarikh_mula)} – ${P.tarikhCantik(s.tarikh_akhir)}`;
+        return `<div class="murid"><span class="nama"><b>${julatT}</b>
+          <small style="color:var(--teks-2)">${P.esc(s.kat ? s.kat.nama : "Ingin berbincang dengan guru kelas")}${s.sbb ? " · " + P.esc(s.sbb.nama) : ""}
+          · ${s.sumber === "GURU" ? "Direkod guru" : "Ibu bapa"}${s.catatan ? " · " + P.esc(s.catatan) : ""}</small></span>
+          <span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${s.minta_jumpa ? `<span class="cip info">Minta jumpa</span>` : ""}
+          ${s.status === "DITOLAK" ? `<span class="cip th">Ditolak</span>` : ""}${hadirJuga.length ? `<span class="cip lw">Murid hadir ${hadirJuga.length} hari</span>` : ""}</span></div>`;
+      }).join("") : `<div class="muat">Tiada sebab dihantar.</div>`;
+
+      // ponteng kelas
+      $("#pPonteng").innerHTML = ponteng.length ? ponteng.map(p => `<tr><td data-label="Tarikh">${P.tarikhCantik(p.tarikh)}</td>
+        <td data-label="Waktu">${P.esc(p.waktu)}</td><td data-label="Subjek"><span>${P.esc(p.subjek)}${p.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(p.catatan)}</small>` : ""}</span></td>
+        <td data-label="Status"><span class="cip ${STATUS_PK[p.status][1]}">${STATUS_PK[p.status][0]}</span></td>
+        <td data-label="Dilapor oleh">${P.esc(p.pelapor ? P.namaPendek(p.pelapor.nama) : "—")}</td></tr>`).join("") : kosong(5, "Tiada laporan ponteng kelas.");
+
+      // surat amaran
+      $("#kSurat").classList.toggle("tersembunyi", !pentadbir());
+      $("#pSurat").innerHTML = surat.length ? surat.map(s => `<tr><td data-label="Tarikh surat">${P.tarikhCantik(s.tarikh_surat)}</td>
+        <td data-label="Surat"><b>${SURAT[s.peringkat]}</b> · ${huruf(s.jenis)}</td><td data-label="Ruj.">(${s.no_siri})</td>
+        <td data-label="Hari tidak hadir">${(s.tarikh_tidak_hadir || []).length} hari</td></tr>`).join("") : kosong(4, "Tiada surat amaran.");
+
+      // susulan
+      $("#pSusulan").innerHTML = susulan.length ? susulan.map(s => `<div class="murid"><span class="nama"><b>${SUSULAN[s.jenis] || P.esc(s.jenis)}</b>
+        <small style="color:var(--teks-2)">${P.tarikhCantik(s.tarikh, true)}${s.catatan ? " · " + P.esc(s.catatan) : ""}</small></span></div>`).join("")
+        : `<div class="muat">Tiada tindakan susulan direkod.</div>`;
+
+      $("#kProfil").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) {
+      $("#pNama").textContent = "Ralat"; $("#pMedan").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`;
+    }
+  }
+
+  mula();
+})();
+</script>
+</body>
+</html>

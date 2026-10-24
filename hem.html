@@ -41,6 +41,7 @@
       <button data-v="ponteng" class="hem">Ponteng kelas</button>
       <button data-v="laporan" class="hem">Laporan</button>
       <button data-v="tetapan" class="hem">Tetapan</button>
+      <button data-v="profil">Profil murid</button>
     </div>
 
     <div class="kad alat">
@@ -226,8 +227,8 @@
     $("#jPonteng").innerHTML = `<tr><td colspan="7" class="muat">Memuatkan…</td></tr>`;
     try {
       const [rekod, kerap] = await Promise.all([
-        P.db.pilih("ponteng_kelas", `select=id,waktu,subjek,status,catatan,pada,murid(nama,kelas(nama,sesi)),pelapor:pengguna!ponteng_kelas_dilapor_oleh_fkey(nama)&tarikh=eq.${$("#tarikh").value}&order=waktu,id`),
-        P.db.pilih("v_kekerapan", `select=murid,kelas,sesi,ponteng_kelas,lewat&or=(ponteng_kelas.gt.0,lewat.gt.0)&order=ponteng_kelas.desc,lewat.desc&limit=50`),
+        P.db.pilih("ponteng_kelas", `select=id,murid_id,waktu,subjek,status,catatan,pada,murid(nama,kelas(nama,sesi)),pelapor:pengguna!ponteng_kelas_dilapor_oleh_fkey(nama)&tarikh=eq.${$("#tarikh").value}&order=waktu,id`),
+        P.db.pilih("v_kekerapan", `select=murid_id,murid,kelas,sesi,ponteng_kelas,lewat&or=(ponteng_kelas.gt.0,lewat.gt.0)&order=ponteng_kelas.desc,lewat.desc&limit=50`),
       ]);
       const sesi = $("#sesi").value;
       const r = rekod.filter(x => !sesi || (x.murid && x.murid.kelas && x.murid.kelas.sesi === sesi));
@@ -236,13 +237,13 @@
       $("#ringkasPonteng").innerHTML = `<span class="cip">Laporan ${r.length}</span><span class="cip lw">Belum disiasat ${n("DILAPOR")}</span><span class="cip th">Ponteng sah ${n("PONTENG")}</span><span class="cip ok">Ada sebab ${n("ADA_SEBAB")}</span>`;
       $("#jPonteng").innerHTML = r.length ? r.map(x => `<tr data-id="${x.id}">
         <td data-label="Waktu">${P.esc(x.waktu)}</td><td data-label="Kelas">${P.esc(x.murid && x.murid.kelas && x.murid.kelas.nama)}</td>
-        <td data-label="Murid"><b>${P.esc(x.murid && x.murid.nama)}</b>${x.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(x.catatan)}</small>` : ""}</td>
+        <td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid && x.murid.nama)}</b>${x.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(x.catatan)}</small>` : ""}</td>
         <td data-label="Subjek">${P.esc(x.subjek)}</td>
         <td data-label="Dilapor oleh">${P.esc(x.pelapor ? P.namaPendek(x.pelapor.nama) : "—")}<br><small style="color:var(--teks-2)">${x.pada ? new Date(x.pada).toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" }) : ""}</small></td>
         <td data-label="Status"><select class="pk-status">${Object.entries(STATUS_PK).map(([s, [l]]) => `<option value="${s}" ${s === x.status ? "selected" : ""}>${l}</option>`).join("")}</select></td>
         <td data-label=""><button class="btn utama kecil pk-simpan">Simpan</button></td></tr>`).join("")
         : `<tr><td colspan="7" class="muat">Tiada laporan ponteng kelas pada tarikh ini.</td></tr>`;
-      $("#jKekerapan").innerHTML = k.length ? k.map(x => `<tr><td data-label="Murid"><b>${P.esc(x.murid)}</b></td><td data-label="Kelas">${P.esc(x.kelas)}</td>
+      $("#jKekerapan").innerHTML = k.length ? k.map(x => `<tr><td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid)}</b></td><td data-label="Kelas">${P.esc(x.kelas)}</td>
         <td class="angka" data-label="Ponteng kelas">${x.ponteng_kelas}</td><td class="angka" data-label="Lewat">${x.lewat}</td></tr>`).join("")
         : `<tr><td colspan="4" class="muat">Tiada rekod ponteng kelas atau lewat tahun ini.</td></tr>`;
     } catch (e) { ralat("#jPonteng", e, 7); }
@@ -284,7 +285,7 @@
         <td class="angka" data-label="Lewat">${x.lewat}</td>
         <td class="angka" data-label="% Hadir"><b style="color:${x.peratus_hadir === null ? "var(--teks-2)" : x.peratus_hadir < 90 ? "var(--merah)" : x.peratus_hadir < 95 ? "var(--oren)" : "var(--hijau)"}">${x.peratus_hadir === null ? "—" : x.peratus_hadir + "%"}</b></td></tr>`).join("");
       $("#jLapMurid").innerHTML = lapMurid.length ? lapMurid.map(x => `<tr>
-        <td data-label="Murid"><b>${P.esc(x.murid)}</b></td><td data-label="Kelas">${P.esc(x.kelas)}</td>
+        <td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid)}</b></td><td data-label="Kelas">${P.esc(x.kelas)}</td>
         <td class="angka" data-label="TH">${x.tidak_hadir}</td><td class="angka" data-label="Tanpa sebab">${x.tanpa_sebab ? `<b style="color:var(--merah)">${x.tanpa_sebab}</b>` : 0}</td>
         <td class="angka" data-label="Lewat">${x.lewat}</td><td class="angka" data-label="Ponteng kelas">${x.ponteng_kelas}</td></tr>`).join("")
         : `<tr><td colspan="6" class="muat">Tiada rekod bagi bulan ini.</td></tr>`;
@@ -317,6 +318,7 @@
   }
 
   document.querySelectorAll("#tabUtama button").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.v === "profil") { location.href = "murid.html"; return; }
     paparan = b.dataset.v;
     document.querySelectorAll("#tabUtama button").forEach(x => x.classList.toggle("aktif", x === b));
     $("#kTarikh").classList.toggle("tersembunyi", paparan === "laporan");
@@ -395,7 +397,7 @@
       $("#pilihSemua").checked = false; $("#bPilihSemua").textContent = "Pilih semua";
       $("#jIdme").innerHTML = senaraiIdme.length ? senaraiIdme.map(r => `<tr>
         <td data-label="Pilih"><input type="checkbox" class="pilih" value="${r.kehadiran_id}" ${r.idme_siap ? "disabled" : ""}></td>
-        <td data-label="Kelas">${P.esc(r.kelas)}</td><td data-label="Murid"><b>${P.esc(r.murid)}</b>${r.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(r.catatan)}</small>` : ""}</td>
+        <td data-label="Kelas">${P.esc(r.kelas)}</td><td data-label="Murid"><b>${P.pautMurid(r.murid_id, r.murid)}</b>${r.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(r.catatan)}</small>` : ""}</td>
         <td data-label="Kategori">${P.esc(r.kategori || "—")}</td><td data-label="Sebab">${P.esc(r.sebab || "—")}</td><td data-label="Keadaan">${KEADAAN[r.keadaan] || ""}</td>
         <td data-label="idMe">${r.idme_siap ? "✅ Siap" : "—"}</td></tr>`).join("") : `<tr><td colspan="7" class="muat">Tiada murid tidak hadir direkodkan.</td></tr>`;
     } catch (e) { ralat("#jIdme", e); }
@@ -430,7 +432,7 @@
         P.db.pilih("surat_amaran", `select=id,murid_id,jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir,murid(nama,kelas(nama))&tarikh_surat=gte.${tahun}-01-01&order=tarikh_surat.desc,id.desc`),
       ]);
       $("#jCalon").innerHTML = calon.length ? calon.map((c, i) => `<tr>
-        <td data-label="Murid"><b>${P.esc(c.murid)}</b></td><td data-label="Kelas">${P.esc(c.kelas)}</td><td data-label="Jenis">${huruf(c.jenis)}</td>
+        <td data-label="Murid"><b>${P.pautMurid(c.murid_id, c.murid)}</b></td><td data-label="Kelas">${P.esc(c.kelas)}</td><td data-label="Jenis">${huruf(c.jenis)}</td>
         <td data-label="Surat"><span class="cip ${c.peringkat === 3 ? "th" : c.peringkat === 2 ? "lw" : "info"}">${PERINGKAT[c.peringkat]}</span></td>
         <td class="angka" data-label="Hari">${c.bil_hari}</td>
         <td data-label="Tarikh"><small>${c.tarikh.map(t => P.tarikhCantik(t)).join(", ")}</small></td>
@@ -444,7 +446,7 @@
       $("#jSurat")._sus = sus;
       $("#jSurat").innerHTML = surat.length ? surat.map((s, i) => `<tr>
         <td data-label="Ruj.">SMKG.700-7/2/2/${s.peringkat} (${s.no_siri})</td><td data-label="Tarikh">${P.tarikhCantik(s.tarikh_surat)}</td>
-        <td data-label="Murid"><b>${P.esc(s.murid && s.murid.nama)}</b></td><td data-label="Kelas">${P.esc(s.murid && s.murid.kelas && s.murid.kelas.nama)}</td>
+        <td data-label="Murid"><b>${P.pautMurid(s.murid_id, s.murid && s.murid.nama)}</b></td><td data-label="Kelas">${P.esc(s.murid && s.murid.kelas && s.murid.kelas.nama)}</td>
         <td data-label="Jenis">${huruf(s.jenis)}</td><td data-label="Surat">${PERINGKAT[s.peringkat]}</td>
         <td data-label="Susulan">${labelSusulan(sus.filter(x => x.surat_id === s.id))}</td>
         <td data-label=""><span style="display:inline-flex;gap:6px;flex-wrap:wrap"><button class="btn garis kecil b-word" data-i="${i}">⬇ Word</button><button class="btn garis kecil b-sus" data-i="${i}">Susulan</button></span></td></tr>

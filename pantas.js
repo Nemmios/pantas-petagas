@@ -158,6 +158,11 @@ const PANTAS = (() => {
     if (!d) return null;
     return d.startsWith("60") ? d : "6" + d;
   }
+  // nama murid sebagai pautan ke profil murid
+  function pautMurid(id, nama) {
+    if (!id) return esc(nama);
+    return `<a class="pautan-murid" href="murid.html?id=${encodeURIComponent(id)}">${esc(nama)}</a>`;
+  }
   function muatTurunCsv(nama, baris) {
     const csv = baris.map(r => r.map(v => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
     const b = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
@@ -166,5 +171,5 @@ const PANTAS = (() => {
   }
 
   return { URL_SB, KUNCI, db, auth, q, simpan, hariIni, tambahHari, tarikhCantik, sesiSekarang,
-           el, esc, namaPendek, toast, salin, telWa, muatTurunCsv };
+           el, esc, namaPendek, toast, salin, telWa, muatTurunCsv, pautMurid };
 })();
