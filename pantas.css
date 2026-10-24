@@ -157,3 +157,14 @@ td select { min-width: 140px; padding: 8px 10px; }
   table.kad-mobile td[data-label=""]::before { content: none; }
   table.kad-mobile td.angka { text-align: left; }
 }
+@media print {
+  .kepala button, .tab, .alat, .tiada-cetak, #toast { display: none !important; }
+  .kepala { position: static; background: #fff; color: #000; border-bottom: 2px solid #000; }
+  .kepala .tajuk small { color: #333; }
+  body { background: #fff; color: #000; }
+  .kad, .stat { box-shadow: none; border-color: #bbb; break-inside: avoid; }
+  table.kad-mobile thead { display: table-header-group !important; }
+  table.kad-mobile tr { display: table-row !important; }
+  table.kad-mobile td { display: table-cell !important; }
+  table.kad-mobile td::before { content: none !important; }
+}
