@@ -821,10 +821,12 @@
     try {
       const m = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
       const ids = m.map(x => x.id);
-      const [th, memo] = await Promise.all([
+      const [th, memo, sebab] = await Promise.all([
         ids.length ? P.db.pilih("kehadiran", `select=murid_id&tarikh=eq.${P.hariIni()}&status=eq.TIDAK_HADIR&murid_id=${inList(ids)}`) : [],
-        ambilMemo(ids, P.hariIni())]);
-      pkData = { m, tiada: new Set(th.map(x => x.murid_id)), memo };
+        ambilMemo(ids, P.hariIni()),
+        ids.length ? P.db.pilih("sebab_tidak_hadir", `select=murid_id,idme_sebab(nama)&murid_id=${inList(ids)}&tarikh_mula=lte.${P.hariIni()}&tarikh_akhir=gte.${P.hariIni()}&status=neq.DITOLAK`) : []]);
+      const sebabTh = {}; sebab.forEach(s => { if (s.idme_sebab) sebabTh[s.murid_id] = huruf(s.idme_sebab.nama); });
+      pkData = { m, tiada: new Set(th.map(x => x.murid_id)), memo, sebabTh };
       lukisPk();
     } catch (e) { $("#pkSenarai").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
   });
@@ -835,12 +837,26 @@
       (x.memo.waktu_mula == null || (w >= x.memo.waktu_mula && w <= x.memo.waktu_akhir)));
     $("#pkSenarai").innerHTML = `<p class="nota" style="margin:0 0 6px">Tanda murid yang <b>tiada</b> dalam kelas:</p><div class="pilihan">` + pkData.m.map(x => {
       const ak = aktiviti(x.id);
-      if (pkData.tiada.has(x.id)) return `<label class="item" style="opacity:.55"><input type="checkbox" disabled><span>${P.esc(x.nama)}<small>Tidak hadir ke sekolah hari ini</small></span></label>`;
+      if (pkData.tiada.has(x.id)) return `<div class="item" style="display:flex;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--garis);border-radius:12px;background:var(--merah-lembut)">
+        <span style="flex:1;min-width:0">${P.esc(x.nama)}<small style="display:block;color:var(--merah)">Tidak hadir ke sekolah hari ini${pkData.sebabTh[x.id] ? " · " + P.esc(pkData.sebabTh[x.id]) : " · belum ada sebab"}</small></span>
+        <button type="button" class="btn garis kecil pk-hadir" data-id="${P.esc(x.id)}" title="Murid ini sebenarnya ada">Dia ada</button></div>`;
       if (ak) return `<label class="item" style="opacity:.75"><input type="checkbox" disabled><span>${P.esc(x.nama)}<small style="color:var(--oren)">🏃 ${P.esc(huruf(ak.memo.nama))} · ${P.esc(teksWaktu(ak.memo))} · ${P.esc(P.namaPendek(ak.memo.guru_nama || ""))}</small></span></label>`;
       return `<label class="item"><input type="checkbox" class="pk-m" value="${P.esc(x.id)}"><span>${P.esc(x.nama)}</span></label>`;
     }).join("") + `</div>`;
   }
   $("#pkWaktu").addEventListener("change", lukisPk);
+  // murid ditanda TH oleh guru waktu pertama tetapi sebenarnya datang (lewat)
+  $("#pkSenarai").addEventListener("click", async e => {
+    const b = e.target.closest(".pk-hadir"); if (!b) return;
+    const m = pkData.m.find(x => x.id === b.dataset.id);
+    if (!confirm(`${m ? m.nama : "Murid ini"} ada dalam kelas anda?\n\nRekod hari ini akan ditukar daripada TIDAK HADIR kepada LEWAT.`)) return;
+    b.disabled = true;
+    try {
+      const masa = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(11, 19);
+      await P.db.upsert("kehadiran", [{ tarikh: P.hariIni(), murid_id: b.dataset.id, status: "LEWAT", masa_tiba: masa, ditanda_oleh: saya.id }], "tarikh,murid_id");
+      pkData.tiada.delete(b.dataset.id); lukisPk(); P.toast("Ditukar kepada LEWAT");
+    } catch (err) { P.toast(err.message, "ralat"); b.disabled = false; }
+  });
   $("#bLaporPk").addEventListener("click", async () => {
     const ids = [...document.querySelectorAll(".pk-m:checked")].map(c => c.value), subjek = $("#pkSubjek").value.trim();
     if (!subjek) return P.toast("Isi subjek", "ralat");
