@@ -187,9 +187,13 @@ a.pautan-murid { color: inherit; text-decoration: underline; text-decoration-col
 .hasil-cari a small { color: var(--teks-2); white-space: nowrap; }
 /* laporan mingguan */
 table.lm { font-size: 13px; }
-table.lm th, table.lm td { padding: 7px 6px; white-space: nowrap; }
+table.lm { table-layout: fixed; width: 100%; }
+table.lm th, table.lm td { padding: 7px 3px; white-space: nowrap; text-align: center; }
+table.lm th:first-child, table.lm td:first-child { width: 32%; text-align: left; padding-left: 0; }
+table.lm th:last-child, table.lm td:last-child { width: 17%; text-align: right; padding-right: 2px; }
+table.lm tfoot td b { font-size: 12px; }
 table.lm td small, table.lm th small { display: block; font-size: 11px; color: var(--teks-2); font-weight: 500; }
-table.lm td:first-child, table.lm th:first-child { position: sticky; left: 0; background: var(--kad); z-index: 1; }
+table.lm td:first-child small { overflow: hidden; text-overflow: ellipsis; }
 table.lm tfoot td { border-top: 2px solid var(--garis); }
 .lm-th { color: var(--merah); font-weight: 700; }
 .lm-belum, .lm-akan { color: var(--teks-2); }
