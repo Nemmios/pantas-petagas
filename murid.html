@@ -69,6 +69,22 @@
       <div class="kad" id="kPenjaga">
         <h2>Ibu bapa / penjaga</h2>
         <div id="pPenjaga" class="muat">Memuatkan…</div>
+        <div id="kTambahPj" class="tiada-cetak tersembunyi" style="margin-top:10px">
+          <button class="btn garis kecil" id="bTambahPj" type="button">+ Tambah penjaga</button>
+          <div id="fTambahPj" class="tersembunyi" style="margin-top:8px">
+            <p class="nota" style="margin:0 0 6px">Untuk penjaga baharu atau penjaga yang bertukar. IC diperlukan supaya penjaga boleh mengesahkan diri dalam borang ibu bapa.</p>
+            <label for="tpNama">Nama penjaga</label><input id="tpNama" maxlength="100">
+            <div class="baris">
+              <div><label for="tpIc">No. IC penjaga</label><input id="tpIc" inputmode="numeric" maxlength="14" placeholder="12 digit"></div>
+              <div><label for="tpTel">No. telefon</label><input id="tpTel" type="tel" inputmode="tel" maxlength="15" placeholder="01xxxxxxxx"></div>
+            </div>
+            <label for="tpHub">Hubungan</label><input id="tpHub" list="senaraiHubungan" maxlength="40" placeholder="cth IBU KANDUNG">
+            <div class="baris" style="margin-top:10px"><button class="btn utama" id="bSimpanPj" type="button">Simpan penjaga</button><button class="btn garis" id="bBatalPj" type="button">Batal</button></div>
+          </div>
+        </div>
+        <datalist id="senaraiHubungan"><option>IBU KANDUNG</option><option>BAPA KANDUNG</option><option>NENEK</option><option>DATUK</option>
+          <option>IBU TIRI</option><option>BAPA TIRI</option><option>IBU SAUDARA</option><option>BAPA SAUDARA</option><option>KAKAK</option>
+          <option>ABANG</option><option>KELUARGA ANGKAT</option><option>PENJAGA</option><option>LAIN-LAIN</option></datalist>
       </div>
 
       <div class="kad">
@@ -113,7 +129,7 @@
     JUMPA_PK_HEM: "🤝 Jumpa PK HEM", JUMPA_PENGETUA: "🤝 Jumpa Pengetua", ZIARAH_RUMAH: "🏠 Ziarah rumah", KAUNSELING: "🗣 Kaunseling", LAIN: "📝 Lain-lain" };
   let saya = null, semuaKelas = [], muridKini = null;
   const pentadbir = () => ["HEM", "ADMIN"].includes(saya.peranan);
-  const bolehHubungi = () => ["GURU_KELAS", "HEM", "ADMIN"].includes(saya.peranan);
+  const bolehHubungi = () => ["GURU_KELAS", "HEM", "ADMIN", "PETUGAS"].includes(saya.peranan);   // juga boleh kemas kini (murid kelas sendiri bagi guru kelas)
   const tunjuk = id => ["vMasuk", "vTiada", "vApp"].forEach(x => $("#" + x).classList.toggle("tersembunyi", x !== id));
   const kosong = (n, teks) => `<tr><td colspan="${n}" class="muat">${teks}</td></tr>`;
 
@@ -170,6 +186,40 @@
   }
   window.addEventListener("popstate", () => { const id = new URLSearchParams(location.search).get("id"); if (id) bukaProfil(id); else $("#kProfil").classList.add("tersembunyi"); });
   $("#pTahun").addEventListener("change", () => muridKini && bukaProfil(muridKini.id));
+
+  // ---------- kemas kini penjaga ----------
+  $("#pPenjaga").addEventListener("click", async e => {
+    const kotak = e.target.closest(".pj"); if (!kotak || !muridKini) return;
+    const borang = kotak.querySelector(".pj-borang"), pid = +kotak.dataset.id;
+    if (e.target.classList.contains("pj-ubah")) return borang.classList.toggle("tersembunyi");
+    if (e.target.classList.contains("pj-batal")) return borang.classList.add("tersembunyi");
+    try {
+      if (e.target.classList.contains("pj-simpan")) {
+        e.target.disabled = true;
+        await P.db.rpc("kemas_kini_penjaga", { p_murid_id: muridKini.id, p_penjaga_id: pid,
+          p_nama: borang.querySelector(".pj-nama").value, p_hubungan: borang.querySelector(".pj-hub").value, p_telefon: borang.querySelector(".pj-tel").value });
+        P.toast("Maklumat penjaga dikemas kini"); bukaProfil(muridKini.id);
+      }
+      if (e.target.classList.contains("pj-buang")) {
+        if (!confirm("Buang penjaga ini daripada murid ini? Penjaga ini tidak lagi boleh mengisi borang sebab tidak hadir untuk murid ini.")) return;
+        await P.db.rpc("buang_penjaga", { p_murid_id: muridKini.id, p_penjaga_id: pid });
+        P.toast("Penjaga dibuang"); bukaProfil(muridKini.id);
+      }
+    } catch (err) { P.toast(err.message, "ralat"); e.target.disabled = false; }
+  });
+  $("#bTambahPj").addEventListener("click", () => $("#fTambahPj").classList.toggle("tersembunyi"));
+  $("#bBatalPj").addEventListener("click", () => $("#fTambahPj").classList.add("tersembunyi"));
+  $("#bSimpanPj").addEventListener("click", async () => {
+    if (!muridKini) return;
+    $("#bSimpanPj").disabled = true;
+    try {
+      await P.db.rpc("tambah_penjaga", { p_murid_id: muridKini.id, p_nama: $("#tpNama").value, p_ic: $("#tpIc").value,
+        p_hubungan: $("#tpHub").value, p_telefon: $("#tpTel").value });
+      ["#tpNama", "#tpIc", "#tpHub", "#tpTel"].forEach(x => ($(x).value = ""));
+      P.toast("Penjaga ditambah"); bukaProfil(muridKini.id);
+    } catch (e) { P.toast(e.message, "ralat"); }
+    finally { $("#bSimpanPj").disabled = false; }
+  });
   $("#bCetak").addEventListener("click", () => window.print());
 
   // ---------- profil ----------
@@ -193,7 +243,7 @@
         P.db.pilih("tindakan_susulan", `select=jenis,tarikh,catatan&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,id.desc`),
         m.kelas_id ? P.db.pilih("kelas_selesai", `select=tarikh&kelas_id=eq.${m.kelas_id}${julat("tarikh")}`) : [],
         pentadbir() ? P.db.pilih("surat_amaran", `select=jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir&murid_id=eq.${P.q(id)}${julat("tarikh_surat")}&order=tarikh_surat.desc`) : [],
-        bolehHubungi() ? P.db.pilih("murid_penjaga", `select=penjaga(nama,hubungan,telefon,ic_4akhir)&murid_id=eq.${P.q(id)}`) : [],
+        bolehHubungi() ? P.db.pilih("murid_penjaga", `select=penjaga(id,nama,hubungan,telefon,ic_4akhir,manual_pada)&murid_id=eq.${P.q(id)}&aktif=is.true`) : [],
       ]);
 
       // padan sebab bagi setiap hari tidak hadir
@@ -219,8 +269,18 @@
         ["No. KP / Sijil lahir", pentadbir() && m.no_kp ? `<span id="kp">${kp}</span> <button class="btn garis kecil tiada-cetak" id="bKp" type="button" style="padding:2px 8px">Lihat</button>` : kp],
         ["Jantina", P.esc(huruf(m.jantina || "—"))],
         ["Guru kelas", P.esc(kelas.guru_kelas || "—")],
-        (pentadbir() || bolehHubungi()) ? ["Alamat", P.esc(m.alamat || "—")] : null,
-      ].filter(Boolean).map(([a, b]) => `<div><small>${a}</small><span>${b}</span></div>`).join("");
+        bolehHubungi() ? ["Alamat", `<span id="teksAlamat">${P.esc(m.alamat || "—")}</span> <button class="btn garis kecil tiada-cetak" id="bAlamat" type="button" style="padding:2px 8px">✏️</button>
+          <span id="fAlamat" class="tersembunyi" style="display:block;margin-top:6px"><textarea id="inAlamat" rows="3" maxlength="300">${P.esc(m.alamat || "")}</textarea>
+          <span style="display:flex;gap:6px;margin-top:6px"><button class="btn utama kecil" id="bSimpanAlamat" type="button">Simpan alamat</button><button class="btn garis kecil" id="bBatalAlamat" type="button">Batal</button></span></span>`] : null,
+      ].filter(Boolean).map(([a, b]) => `<div${a === "Alamat" ? ' style="grid-column:1/-1"' : ""}><small>${a}</small><span>${b}</span></div>`).join("");
+      if ($("#bAlamat")) {
+        $("#bAlamat").addEventListener("click", () => $("#fAlamat").classList.toggle("tersembunyi"));
+        $("#bBatalAlamat").addEventListener("click", () => $("#fAlamat").classList.add("tersembunyi"));
+        $("#bSimpanAlamat").addEventListener("click", async () => {
+          try { await P.db.rpc("kemas_kini_alamat", { p_murid_id: m.id, p_alamat: $("#inAlamat").value }); P.toast("Alamat dikemas kini"); bukaProfil(m.id); }
+          catch (e) { P.toast(e.message, "ralat"); }
+        });
+      }
       const bKp = $("#bKp"); if (bKp) bKp.addEventListener("click", () => { $("#kp").textContent = m.no_kp; bKp.remove(); });
 
       // statistik
@@ -242,13 +302,22 @@
       // penjaga
       $("#kPenjaga").classList.toggle("tersembunyi", !bolehHubungi());
       const pj = penjaga.map(x => x.penjaga).filter(Boolean);
+      $("#kTambahPj").classList.toggle("tersembunyi", !bolehHubungi()); $("#fTambahPj").classList.add("tersembunyi");
       $("#pPenjaga").className = "";
       $("#pPenjaga").innerHTML = pj.length ? pj.map(p => {
         const wa = P.telWa(p.telefon);
-        return `<div class="murid"><span class="nama"><b>${P.esc(p.nama || "—")}</b>
-          <small style="color:var(--teks-2)">${P.esc(huruf(p.hubungan || "Penjaga"))}${p.telefon ? " · " + P.esc(p.telefon) : " · tiada no. telefon"}</small></span>
-          ${p.telefon ? `<span class="tiada-cetak" style="display:flex;gap:6px"><a class="btn garis kecil" href="tel:${P.esc(p.telefon)}">📞</a>
-          <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a></span>` : ""}</div>`;
+        return `<div class="pj" data-id="${p.id}"><div class="murid"><span class="nama"><b>${P.esc(p.nama || "—")}</b>
+          <small style="color:var(--teks-2)">${P.esc(huruf(p.hubungan || "Penjaga"))}${p.telefon ? " · " + P.esc(p.telefon) : ` · <span style="color:var(--merah)">tiada no. telefon</span>`}${p.ic_4akhir ? " · IC ••••" + P.esc(p.ic_4akhir) : ""}
+          ${p.manual_pada ? `<br>Dikemas kini di sekolah: ${P.tarikhCantik(p.manual_pada.slice(0, 10))}` : ""}</small></span>
+          <span class="tiada-cetak" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${p.telefon ? `<a class="btn garis kecil" href="tel:${P.esc(p.telefon)}">📞</a>
+          <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a>` : ""}<button class="btn garis kecil pj-ubah" type="button">✏️</button></span></div>
+          <div class="pj-borang tiada-cetak tersembunyi" style="padding:4px 4px 12px">
+            <label>Nama</label><input class="pj-nama" value="${P.esc(p.nama || "")}" maxlength="100">
+            <div class="baris"><div><label>Hubungan</label><input class="pj-hub" list="senaraiHubungan" value="${P.esc(p.hubungan || "")}" maxlength="40"></div>
+            <div><label>No. telefon</label><input class="pj-tel" type="tel" inputmode="tel" value="${P.esc(p.telefon || "")}" maxlength="15" placeholder="01xxxxxxxx"></div></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px"><button class="btn utama kecil pj-simpan" type="button">Simpan</button>
+            <button class="btn garis kecil pj-batal" type="button">Batal</button><button class="btn garis kecil pj-buang" type="button" style="color:var(--merah)">Buang penjaga ini</button></div>
+          </div></div>`;
       }).join("") : `<div class="muat">Tiada maklumat penjaga.</div>`;
 
       // rekod kehadiran

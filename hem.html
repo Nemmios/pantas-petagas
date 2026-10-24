@@ -497,7 +497,7 @@
   async function janaSurat(rekod) {
     const [m, pj, dulu] = await Promise.all([
       P.db.pilih("murid", `select=nama,no_kp,alamat,kelas(nama)&id=eq.${P.q(rekod.murid_id)}`),
-      P.db.pilih("murid_penjaga", `select=penjaga(nama,hubungan)&murid_id=eq.${P.q(rekod.murid_id)}`),
+      P.db.pilih("murid_penjaga", `select=penjaga(nama,hubungan)&murid_id=eq.${P.q(rekod.murid_id)}&aktif=is.true`),
       rekod.peringkat === 3 ? P.db.pilih("surat_amaran",
         `select=peringkat,no_siri,tarikh_surat&murid_id=eq.${P.q(rekod.murid_id)}&jenis=eq.${rekod.jenis}&peringkat=lt.3&order=tarikh_surat.desc`) : [],
     ]);

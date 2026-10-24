@@ -436,7 +436,7 @@
       const ids = [...new Set(perlu.map(r => r.murid_id))];
       let tel = {};
       if (ids.length) {
-        const pj = await P.db.pilih("murid_penjaga", `select=murid_id,penjaga(nama,telefon,hubungan)&murid_id=${inList(ids)}`);
+        const pj = await P.db.pilih("murid_penjaga", `select=murid_id,penjaga(nama,telefon,hubungan)&murid_id=${inList(ids)}&aktif=is.true`);
         pj.forEach(x => { if (x.penjaga && x.penjaga.telefon) (tel[x.murid_id] = tel[x.murid_id] || []).push(x.penjaga); });
       }
       const ada = rekod.length - perlu.length;
