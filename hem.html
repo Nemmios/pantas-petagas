@@ -161,6 +161,14 @@
         </div>
         <div class="jadual-bungkus"><table><tbody id="jCuti"></tbody></table></div>
       </div>
+      <div class="kad" id="kSandaran">
+        <h2>Sandaran data</h2>
+        <p class="nota">Pelan percuma Supabase tiada sandaran automatik. Muat turun sandaran sekurang-kurangnya <b>sebulan sekali</b> dan sebelum cuti panjang.
+          Fail ini mengandungi data peribadi murid dan penjaga: simpan di Google Drive DELIMa anda, jangan kongsi di grup.</p>
+        <p class="nota" id="sandaranAkhir" style="margin-top:-4px"></p>
+        <button class="btn utama" id="bSandaran" type="button">⬇ Muat turun sandaran</button>
+        <div id="mSandaran"></div>
+      </div>
     </div>
   </section>
 </main>
@@ -498,9 +506,37 @@
   }
 
   // ---------- tetapan ----------
+  // ---------- sandaran ----------
+  const JADUAL_SANDARAN = ["kelas", "murid", "penjaga", "murid_penjaga", "pengguna", "takwim_cuti", "jadual_waktu",
+    "kehadiran", "kelas_selesai", "sebab_tidak_hadir", "surat_amaran", "tindakan_susulan", "ponteng_kelas"];
+  function paparSandaranAkhir() {
+    const t = P.simpan.get("pantas.sandaranAkhir");
+    const hari = t ? Math.round((Date.parse(P.hariIni()) - Date.parse(t)) / 864e5) : null;
+    $("#sandaranAkhir").innerHTML = t ? `Sandaran terakhir dari telefon/komputer ini: <b>${P.tarikhCantik(t)}</b> (${hari} hari lalu)${hari > 30 ? ` <span class="cip th">Sudah lama</span>` : ""}`
+      : `<span class="cip lw">Belum pernah dimuat turun dari peranti ini</span>`;
+  }
+  $("#bSandaran").addEventListener("click", async () => {
+    $("#bSandaran").disabled = true;
+    const data = { sistem: "PANTAS Petagas", versi: 1, dijana_pada: new Date().toISOString(), oleh: saya.nama, jadual: {} };
+    try {
+      for (const [i, j] of JADUAL_SANDARAN.entries()) {
+        $("#mSandaran").innerHTML = `<div class="mesej info">Mengambil ${j}… (${i + 1}/${JADUAL_SANDARAN.length})</div>`;
+        data.jadual[j] = await P.db.pilih(j, "select=*");
+      }
+      const blob = new Blob([JSON.stringify(data)], { type: "application/json" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `pantas-sandaran-${P.hariIni()}.json`;
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      P.simpan.set("pantas.sandaranAkhir", P.hariIni()); paparSandaranAkhir();
+      const ringkas = JADUAL_SANDARAN.map(j => `${j}: ${data.jadual[j].length}`).join(" · ");
+      $("#mSandaran").innerHTML = `<div class="mesej ok">Sandaran dimuat turun (${(blob.size / 1024 / 1024).toFixed(1)} MB).<br><small>${ringkas}</small></div>`;
+    } catch (e) { $("#mSandaran").innerHTML = `<div class="mesej ralat">Gagal: ${P.esc(e.message)}</div>`; }
+    finally { $("#bSandaran").disabled = false; }
+  });
+
   async function muatTetapan() {
     $("#jPengguna").innerHTML = `<tr><td colspan="4" class="muat">Memuatkan…</td></tr>`;
     const admin = saya.peranan === "ADMIN";
+    $("#kSandaran").classList.toggle("tersembunyi", !admin); if (admin) paparSandaranAkhir();
     try {
       const [pengguna, cuti] = await Promise.all([
         P.db.pilih("pengguna", "select=id,nama,peranan,kelas_id&order=peranan,nama"),
