@@ -6,6 +6,7 @@ const PANTAS = (() => {
   const URL_SB = "https://cgddwlscylvxbwkwbgzk.supabase.co";
   const KUNCI = "sb_publishable_9mHWI4BxESDLswhJ-DmgOw_wEYV9oAZ"; // kunci awam (selamat dikongsi)
   const KUNCI_SESI = "pantas.sesi";
+  const WA_ADMIN = "60148658027";   // nombor WhatsApp Admin PANTAS (untuk "Lupa kata laluan")
 
   // ---------- storan selamat ----------
   const simpan = {
@@ -178,7 +179,7 @@ const PANTAS = (() => {
       <textarea rows="4" readonly>${esc(teks)}</textarea>
       <div class="baris" style="margin-top:10px">
         <button class="btn garis lk-salin" type="button">Salin mesej</button>
-        <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(teks)}">WhatsApp</a>
+        <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/${WA_ADMIN}?text=${encodeURIComponent(teks)}">WhatsApp Admin</a>
       </div>
       <button class="btn garis penuh lk-tutup" type="button" style="margin-top:10px">Tutup</button>`);
     t.querySelector(".lk-salin").addEventListener("click", () => salin(teks).then(() => toast("Mesej disalin")));
