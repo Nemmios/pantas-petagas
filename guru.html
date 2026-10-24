@@ -650,7 +650,9 @@
     const hari = [0, 1, 2, 3, 4].map(i => P.tambahHari(lmIsnin, i));
     const baris = lmData.filter(r => !sesi || r.sesi === sesi);
     const kelasList = [...new Map(baris.map(r => [r.kelas_id, r])).values()];
-    const hariStat = hari.map(t => ({ t, th: 0, enrol: 0, cuti: false, akan: t > kini }));
+    // hari tanpa sebarang kelas ditanda (cth sebelum sistem digunakan) = tiada data, bukan "belum ditanda"
+    const adaData = new Set(lmData.filter(r => r.ditanda).map(r => r.tarikh));
+    const hariStat = hari.map(t => ({ t, th: 0, enrol: 0, cuti: false, akan: t > kini || !adaData.has(t) }));
     let th = 0, hm = 0, lw = 0, belum = 0;
     const kelas = kelasList.map(k => {
       let kth = 0, khm = 0;
@@ -658,7 +660,7 @@
         const r = baris.find(x => x.kelas_id === k.kelas_id && x.tarikh === t);
         if (!r) return { jenis: "kosong" };
         if (r.cuti) { hariStat[i].cuti = true; return { jenis: "cuti" }; }
-        if (t > kini) return { jenis: "akan" };
+        if (t > kini || !adaData.has(t)) return { jenis: "akan" };
         if (!r.ditanda) { belum++; return { jenis: "belum" }; }
         kth += r.tidak_hadir; khm += r.enrolmen; lw += r.lewat;
         hariStat[i].th += r.tidak_hadir; hariStat[i].enrol += r.enrolmen;
