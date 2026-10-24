@@ -216,11 +216,14 @@ const PANTAS = (() => {
     t.textContent = msg; t.className = `tunjuk ${jenis}`;
     clearTimeout(t._h); t._h = setTimeout(() => (t.className = ""), 3200);
   }
-  function salin(teks) {
-    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(teks);
-    const a = document.createElement("textarea"); a.value = teks; document.body.appendChild(a); a.select();
+  function salinLama(teks) {
+    const a = document.createElement("textarea"); a.value = teks; a.setAttribute("readonly", ""); a.style.position = "fixed"; a.style.opacity = "0";
+    document.body.appendChild(a); a.select();
     try { document.execCommand("copy"); } finally { a.remove(); }
-    return Promise.resolve();
+  }
+  function salin(teks) {
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(teks).catch(() => salinLama(teks));
+    salinLama(teks); return Promise.resolve();
   }
   function telWa(tel) {
     const d = String(tel || "").replace(/\D/g, "");

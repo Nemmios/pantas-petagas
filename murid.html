@@ -30,7 +30,7 @@
 
   <section id="vTiada" class="kad tersembunyi">
     <h2>Akses terhad</h2>
-    <p class="nota">Profil murid hanya untuk guru kelas, HEM, petugas dan pentadbir.</p>
+    <p class="nota">Akaun anda belum diluluskan oleh Admin PANTAS.</p>
     <a class="btn utama" href="guru.html">Buka PANTAS Guru</a>
   </section>
 
@@ -129,7 +129,8 @@
     JUMPA_PK_HEM: "🤝 Jumpa PK HEM", JUMPA_PENGETUA: "🤝 Jumpa Pengetua", ZIARAH_RUMAH: "🏠 Ziarah rumah", KAUNSELING: "🗣 Kaunseling", LAIN: "📝 Lain-lain" };
   let saya = null, semuaKelas = [], muridKini = null;
   const pentadbir = () => ["HEM", "ADMIN"].includes(saya.peranan);
-  const bolehHubungi = () => ["GURU_KELAS", "HEM", "ADMIN", "PETUGAS"].includes(saya.peranan);   // juga boleh kemas kini (murid kelas sendiri bagi guru kelas)
+  // semua guru boleh melihat; kemas kini hanya guru kelas (kelas sendiri), petugas, HEM, admin
+  const bolehUrus = m => ["HEM", "ADMIN", "PETUGAS"].includes(saya.peranan) || (saya.peranan === "GURU_KELAS" && m && m.kelas_id === saya.kelas_id);
   const tunjuk = id => ["vMasuk", "vTiada", "vApp"].forEach(x => $("#" + x).classList.toggle("tersembunyi", x !== id));
   const kosong = (n, teks) => `<tr><td colspan="${n}" class="muat">${teks}</td></tr>`;
 
@@ -147,17 +148,12 @@
     if (!P.auth.sesi) return tunjuk("vMasuk");
     try { saya = await P.auth.pengguna(); } catch { await P.auth.keluar(); return tunjuk("vMasuk"); }
     $("#bKeluar").classList.remove("tersembunyi");
-    if (!saya || !["GURU_KELAS", "HEM", "ADMIN", "PETUGAS"].includes(saya.peranan)) return tunjuk("vTiada");
+    if (!saya || !["GURU", "GURU_KELAS", "HEM", "ADMIN", "PETUGAS"].includes(saya.peranan)) return tunjuk("vTiada");
     $("#siapa").textContent = `${P.namaPendek(saya.nama)} · ${huruf(saya.peranan.replace("_", " "))}`;
     tunjuk("vApp");
     semuaKelas = await P.db.pilih("kelas", "select=id,nama,sesi,guru_kelas&order=nama");
-    if (saya.peranan === "GURU_KELAS") {           // guru kelas: murid kelas sendiri sahaja
-      const k = semuaKelas.find(x => x.id === saya.kelas_id);
-      $("#cKelas").innerHTML = k ? `<option value="${k.id}">${P.esc(k.nama)}</option>` : `<option value="">—</option>`;
-      $("#cKelas").disabled = true;
-    } else {
-      $("#cKelas").innerHTML = `<option value="">Semua kelas</option>` + semuaKelas.map(k => `<option value="${k.id}">${P.esc(k.nama)}</option>`).join("");
-    }
+    $("#cKelas").innerHTML = `<option value="">Semua kelas</option>` +
+      semuaKelas.map(k => `<option value="${k.id}" ${k.id === saya.kelas_id ? "selected" : ""}>${P.esc(k.nama)}</option>`).join("");
     const thn = +P.hariIni().slice(0, 4);
     $("#pTahun").innerHTML = [thn, thn - 1].map(t => `<option>${t}</option>`).join("");
     const id = new URLSearchParams(location.search).get("id");
@@ -232,7 +228,6 @@
       const [m] = await P.db.pilih("murid", `select=id,nama,no_kp,jantina,status,aktif,alamat,kelas_id&id=eq.${P.q(id)}`);
       if (!m) { $("#pNama").textContent = "Murid tidak dijumpai"; return; }
       const kelas = semuaKelas.find(k => k.id === m.kelas_id) || {};
-      if (saya.peranan === "GURU_KELAS" && m.kelas_id !== saya.kelas_id) { $("#pNama").textContent = "Murid ini bukan dari kelas anda"; return; }
       muridKini = m;
       document.title = `${P.namaPendek(m.nama)} · Profil Murid`;
 
@@ -243,7 +238,7 @@
         P.db.pilih("tindakan_susulan", `select=jenis,tarikh,catatan&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,id.desc`),
         m.kelas_id ? P.db.pilih("kelas_selesai", `select=tarikh&kelas_id=eq.${m.kelas_id}${julat("tarikh")}`) : [],
         pentadbir() ? P.db.pilih("surat_amaran", `select=jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir&murid_id=eq.${P.q(id)}${julat("tarikh_surat")}&order=tarikh_surat.desc`) : [],
-        bolehHubungi() ? P.db.pilih("murid_penjaga", `select=penjaga(id,nama,hubungan,telefon,ic_4akhir,manual_pada)&murid_id=eq.${P.q(id)}&aktif=is.true`) : [],
+        P.db.pilih("murid_penjaga", `select=penjaga(id,nama,hubungan,telefon,ic_4akhir,manual_pada)&murid_id=eq.${P.q(id)}&aktif=is.true`),
       ]);
 
       // padan sebab bagi setiap hari tidak hadir
@@ -269,7 +264,7 @@
         ["No. KP / Sijil lahir", pentadbir() && m.no_kp ? `<span id="kp">${kp}</span> <button class="btn garis kecil tiada-cetak" id="bKp" type="button" style="padding:2px 8px">Lihat</button>` : kp],
         ["Jantina", P.esc(huruf(m.jantina || "—"))],
         ["Guru kelas", P.esc(kelas.guru_kelas || "—")],
-        bolehHubungi() ? ["Alamat", `<span id="teksAlamat">${P.esc(m.alamat || "—")}</span> <button class="btn garis kecil tiada-cetak" id="bAlamat" type="button" style="padding:2px 8px">✏️</button>
+        bolehUrus(m) ? ["Alamat", `<span id="teksAlamat">${P.esc(m.alamat || "—")}</span> <button class="btn garis kecil tiada-cetak" id="bAlamat" type="button" style="padding:2px 8px">✏️</button>
           <span id="fAlamat" class="tersembunyi" style="display:block;margin-top:6px"><textarea id="inAlamat" rows="3" maxlength="300">${P.esc(m.alamat || "")}</textarea>
           <span style="display:flex;gap:6px;margin-top:6px"><button class="btn utama kecil" id="bSimpanAlamat" type="button">Simpan alamat</button><button class="btn garis kecil" id="bBatalAlamat" type="button">Batal</button></span></span>`] : null,
       ].filter(Boolean).map(([a, b]) => `<div${a === "Alamat" ? ' style="grid-column:1/-1"' : ""}><small>${a}</small><span>${b}</span></div>`).join("");
@@ -300,9 +295,9 @@
       $("#pBulan").innerHTML = BULAN.slice(0, bulanAkhir).map((b, i) => `<div class="${bil[i] ? "ada" : ""}"><b>${bil[i]}</b>${b}</div>`).join("");
 
       // penjaga
-      $("#kPenjaga").classList.toggle("tersembunyi", !bolehHubungi());
       const pj = penjaga.map(x => x.penjaga).filter(Boolean);
-      $("#kTambahPj").classList.toggle("tersembunyi", !bolehHubungi()); $("#fTambahPj").classList.add("tersembunyi");
+      const urus = bolehUrus(m);
+      $("#kTambahPj").classList.toggle("tersembunyi", !urus); $("#fTambahPj").classList.add("tersembunyi");
       $("#pPenjaga").className = "";
       $("#pPenjaga").innerHTML = pj.length ? pj.map(p => {
         const wa = P.telWa(p.telefon);
@@ -310,7 +305,7 @@
           <small style="color:var(--teks-2)">${P.esc(huruf(p.hubungan || "Penjaga"))}${p.telefon ? " · " + P.esc(p.telefon) : ` · <span style="color:var(--merah)">tiada no. telefon</span>`}${p.ic_4akhir ? " · IC ••••" + P.esc(p.ic_4akhir) : ""}
           ${p.manual_pada ? `<br>Dikemas kini di sekolah: ${P.tarikhCantik(p.manual_pada.slice(0, 10))}` : ""}</small></span>
           <span class="tiada-cetak" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">${p.telefon ? `<a class="btn garis kecil" href="tel:${P.esc(p.telefon)}">📞</a>
-          <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a>` : ""}<button class="btn garis kecil pj-ubah" type="button">✏️</button></span></div>
+          <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/${wa}">WhatsApp</a>` : ""}${urus ? `<button class="btn garis kecil pj-ubah" type="button">✏️</button>` : ""}</span></div>
           <div class="pj-borang tiada-cetak tersembunyi" style="padding:4px 4px 12px">
             <label>Nama</label><input class="pj-nama" value="${P.esc(p.nama || "")}" maxlength="100">
             <div class="baris"><div><label>Hubungan</label><input class="pj-hub" list="senaraiHubungan" value="${P.esc(p.hubungan || "")}" maxlength="40"></div>
@@ -319,6 +314,7 @@
             <button class="btn garis kecil pj-batal" type="button">Batal</button><button class="btn garis kecil pj-buang" type="button" style="color:var(--merah)">Buang penjaga ini</button></div>
           </div></div>`;
       }).join("") : `<div class="muat">Tiada maklumat penjaga.</div>`;
+      if (!urus) $("#pPenjaga").insertAdjacentHTML("beforeend", `<p class="nota tiada-cetak" style="margin:8px 0 0">Maklumat salah atau sudah bertukar? Maklumkan guru kelas (${P.esc(kelas.guru_kelas || "—")}) untuk kemas kini.</p>`);
 
       // rekod kehadiran
       $("#pHadir").innerHTML = hadir.length ? hadir.map(h => {

@@ -185,6 +185,15 @@ a.pautan-murid { color: inherit; text-decoration: underline; text-decoration-col
 .hasil-cari a { display: flex; justify-content: space-between; gap: 10px; padding: 11px 4px; border-bottom: 1px solid var(--garis);
   color: var(--teks); text-decoration: none; font-size: 14.5px; }
 .hasil-cari a small { color: var(--teks-2); white-space: nowrap; }
+/* laporan mingguan */
+table.lm { font-size: 13px; }
+table.lm th, table.lm td { padding: 7px 6px; white-space: nowrap; }
+table.lm td small, table.lm th small { display: block; font-size: 11px; color: var(--teks-2); font-weight: 500; }
+table.lm td:first-child, table.lm th:first-child { position: sticky; left: 0; background: var(--kad); z-index: 1; }
+table.lm tfoot td { border-top: 2px solid var(--garis); }
+.lm-th { color: var(--merah); font-weight: 700; }
+.lm-belum, .lm-akan { color: var(--teks-2); }
+.lm-cuti { color: var(--teks-2); font-style: italic; }
 /* dialog */
 .tirai { position: fixed; inset: 0; background: rgba(10, 15, 25, .6); z-index: 40; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
 .tirai .dialog { width: 100%; max-width: 420px; margin: 0; }
