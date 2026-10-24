@@ -63,12 +63,13 @@
         <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
           <div><h2>Senarai untuk diisi dalam idMe</h2><p class="nota" style="margin:0">Murid tidak hadir sahaja (murid lewat dikira hadir).</p></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn garis kecil" id="bPilihSemua">Pilih semua</button>
             <button class="btn garis kecil" id="bCsv">Eksport CSV</button>
             <button class="btn utama kecil" id="bSiap">Tanda terpilih: siap idMe</button>
           </div>
         </div>
         <div class="ringkasan" id="ringkasIdme"></div>
-        <div class="jadual-bungkus"><table>
+        <div class="jadual-bungkus"><table class="kad-mobile">
           <thead><tr><th><input type="checkbox" id="pilihSemua" aria-label="Pilih semua"></th><th>Kelas</th><th>Murid</th><th>Kategori idMe</th><th>Sebab idMe</th><th>Keadaan</th><th>idMe</th></tr></thead>
           <tbody id="jIdme"></tbody></table></div>
       </div>
@@ -79,7 +80,7 @@
       <div class="kad">
         <h2>Calon surat amaran</h2>
         <p class="nota">Dikira automatik daripada hari tidak hadir tanpa sebab (termasuk Ponteng). Berterusan: 3 / 10 / 17 hari. Berkala: 10 / 20 / 40 hari. Cuti dalam Takwim tidak dikira.</p>
-        <div class="jadual-bungkus"><table>
+        <div class="jadual-bungkus"><table class="kad-mobile">
           <thead><tr><th>Murid</th><th>Kelas</th><th>Jenis</th><th>Surat</th><th class="angka">Hari</th><th>Tarikh tidak hadir</th><th></th></tr></thead>
           <tbody id="jCalon"></tbody></table></div>
       </div>
@@ -202,15 +203,20 @@
       senaraiIdme = (await ambilTakHadir()).filter(r => r.status === "TIDAK_HADIR");
       const siap = senaraiIdme.filter(r => r.idme_siap).length;
       $("#ringkasIdme").innerHTML = `<span class="cip th">Tidak hadir ${senaraiIdme.length}</span><span class="cip ok">Siap idMe ${siap}</span><span class="cip">Belum ${senaraiIdme.length - siap}</span>`;
-      $("#pilihSemua").checked = false;
+      $("#pilihSemua").checked = false; $("#bPilihSemua").textContent = "Pilih semua";
       $("#jIdme").innerHTML = senaraiIdme.length ? senaraiIdme.map(r => `<tr>
-        <td><input type="checkbox" class="pilih" value="${r.kehadiran_id}" ${r.idme_siap ? "disabled" : ""}></td>
-        <td>${P.esc(r.kelas)}</td><td>${P.esc(r.murid)}${r.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(r.catatan)}</small>` : ""}</td>
-        <td>${P.esc(r.kategori || "—")}</td><td>${P.esc(r.sebab || "—")}</td><td>${KEADAAN[r.keadaan] || ""}</td>
-        <td>${r.idme_siap ? "✅" : ""}</td></tr>`).join("") : `<tr><td colspan="7" class="muat">Tiada murid tidak hadir direkodkan.</td></tr>`;
+        <td data-label="Pilih"><input type="checkbox" class="pilih" value="${r.kehadiran_id}" ${r.idme_siap ? "disabled" : ""}></td>
+        <td data-label="Kelas">${P.esc(r.kelas)}</td><td data-label="Murid"><b>${P.esc(r.murid)}</b>${r.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(r.catatan)}</small>` : ""}</td>
+        <td data-label="Kategori">${P.esc(r.kategori || "—")}</td><td data-label="Sebab">${P.esc(r.sebab || "—")}</td><td data-label="Keadaan">${KEADAAN[r.keadaan] || ""}</td>
+        <td data-label="idMe">${r.idme_siap ? "✅ Siap" : "—"}</td></tr>`).join("") : `<tr><td colspan="7" class="muat">Tiada murid tidak hadir direkodkan.</td></tr>`;
     } catch (e) { ralat("#jIdme", e); }
   }
   $("#pilihSemua").addEventListener("change", e => document.querySelectorAll("#jIdme .pilih:not(:disabled)").forEach(c => (c.checked = e.target.checked)));
+  $("#bPilihSemua").addEventListener("click", () => {
+    const k = [...document.querySelectorAll("#jIdme .pilih:not(:disabled)")], semua = k.length && k.every(c => c.checked);
+    k.forEach(c => (c.checked = !semua)); $("#pilihSemua").checked = !semua;
+    $("#bPilihSemua").textContent = semua ? "Pilih semua" : "Nyahpilih";
+  });
   $("#bSiap").addEventListener("click", async () => {
     const ids = [...document.querySelectorAll("#jIdme .pilih:checked")].map(c => c.value);
     if (!ids.length) return P.toast("Pilih sekurang-kurangnya satu murid", "ralat");
@@ -235,11 +241,11 @@
         P.db.pilih("surat_amaran", `select=id,jenis,peringkat,no_siri,tarikh_surat,murid(nama,kelas(nama))&tarikh_surat=gte.${tahun}-01-01&order=tarikh_surat.desc,id.desc`),
       ]);
       $("#jCalon").innerHTML = calon.length ? calon.map((c, i) => `<tr>
-        <td>${P.esc(c.murid)}</td><td>${P.esc(c.kelas)}</td><td>${huruf(c.jenis)}</td>
-        <td><span class="cip ${c.peringkat === 3 ? "th" : c.peringkat === 2 ? "lw" : "info"}">${PERINGKAT[c.peringkat]}</span></td>
-        <td class="angka">${c.bil_hari}</td>
-        <td><small>${c.tarikh.map(t => P.tarikhCantik(t)).join(", ")}</small></td>
-        <td><button class="btn utama kecil b-keluar" data-i="${i}">Rekod dikeluarkan</button></td></tr>`).join("")
+        <td data-label="Murid"><b>${P.esc(c.murid)}</b></td><td data-label="Kelas">${P.esc(c.kelas)}</td><td data-label="Jenis">${huruf(c.jenis)}</td>
+        <td data-label="Surat"><span class="cip ${c.peringkat === 3 ? "th" : c.peringkat === 2 ? "lw" : "info"}">${PERINGKAT[c.peringkat]}</span></td>
+        <td class="angka" data-label="Hari">${c.bil_hari}</td>
+        <td data-label="Tarikh"><small>${c.tarikh.map(t => P.tarikhCantik(t)).join(", ")}</small></td>
+        <td data-label=""><button class="btn utama kecil b-keluar" data-i="${i}">Rekod dikeluarkan</button></td></tr>`).join("")
         : `<tr><td colspan="7" class="muat">Tiada calon surat amaran buat masa ini.</td></tr>`;
       $("#jCalon")._calon = calon;
       $("#jSurat").innerHTML = surat.length ? surat.map(s => `<tr>
