@@ -205,6 +205,13 @@ table.lm-murid th:last-child, table.lm-murid td:last-child { width: 10%; }
 .lm-klik { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .lm-belum, .lm-akan { color: var(--teks-2); }
 .lm-cuti { color: var(--teks-2); font-style: italic; }
+/* jadual padat (muat skrin telefon) */
+table.padat { font-size: 13px; }
+table.padat th, table.padat td { padding: 8px 4px; }
+table.padat th { font-size: 11px; }
+table.padat td:first-child { overflow-wrap: anywhere; }
+table.padat td small { display: block; font-size: 11.5px; color: var(--teks-2); }
+table.padat td.angka, table.padat th.angka { white-space: nowrap; }
 /* carta */
 .c-tip { position: absolute; top: 4px; min-width: 150px; background: var(--kad); border: 1px solid var(--garis); border-radius: 10px;
   padding: 7px 10px; font-size: 12.5px; box-shadow: var(--bayang); pointer-events: none; }

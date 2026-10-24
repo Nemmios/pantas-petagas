@@ -164,15 +164,15 @@
             <button class="btn utama kecil" id="bCetak">Cetak / PDF</button>
           </div>
         </div>
-        <div class="jadual-bungkus" style="margin-top:10px"><table class="kad-mobile">
-          <thead><tr><th>Kelas</th><th>Guru kelas</th><th class="angka">Enrolmen</th><th class="angka">Hari ditanda</th><th class="angka">TH</th><th class="angka">Tanpa sebab</th><th class="angka">Lewat</th><th class="angka">% Hadir</th></tr></thead>
+        <div class="jadual-bungkus" style="margin-top:10px"><table class="padat">
+          <thead><tr><th>Kelas</th><th class="angka" title="Hari ditanda">Hari</th><th class="angka">TH</th><th class="angka" title="Tanpa sebab">T/S</th><th class="angka">Lewat</th><th class="angka">% Hadir</th></tr></thead>
           <tbody id="jLapKelas"></tbody></table></div>
       </div>
       <div class="kad">
         <h2>Murid yang perlu perhatian</h2>
         <p class="nota">Murid yang tidak hadir, lewat atau ponteng kelas pada bulan ini. Disusun mengikut hari tanpa sebab.</p>
-        <div class="jadual-bungkus"><table class="kad-mobile">
-          <thead><tr><th>Murid</th><th>Kelas</th><th class="angka">TH</th><th class="angka">Tanpa sebab</th><th class="angka">Lewat</th><th class="angka">Ponteng kelas</th></tr></thead>
+        <div class="jadual-bungkus"><table class="padat">
+          <thead><tr><th>Murid</th><th class="angka">TH</th><th class="angka" title="Tanpa sebab">T/S</th><th class="angka">Lewat</th><th class="angka" title="Ponteng kelas">PK</th></tr></thead>
           <tbody id="jLapMurid"></tbody></table></div>
       </div>
     </div>
@@ -312,7 +312,7 @@
     const [y, m] = bln.split("-").map(Number);
     const NAMA_BULAN = ["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"];
     $("#tajukLaporan").textContent = `Laporan kehadiran ${NAMA_BULAN[m - 1]} ${y}`;
-    $("#jLapKelas").innerHTML = `<tr><td colspan="8" class="muat">Memuatkan…</td></tr>`;
+    $("#jLapKelas").innerHTML = `<tr><td colspan="6" class="muat">Memuatkan…</td></tr>`;
     try {
       const lepas = new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 10);
       const [k, mu, harian, sebab, kLepas] = await Promise.all([P.db.rpcSemua("laporan_bulanan_kelas", { p_bulan: tarikh }), P.db.rpcSemua("laporan_bulanan_murid", { p_bulan: tarikh }),
@@ -333,16 +333,16 @@
         <div class="stat oren"><b>${jum("lewat")}</b><span>Lewat</span></div>
         <div class="stat biru"><b>${lapMurid.reduce((a, x) => a + x.ponteng_kelas, 0)}</b><span>Ponteng kelas</span></div>`;
       $("#jLapKelas").innerHTML = lapKelas.map(x => `<tr>
-        <td data-label="Kelas"><b>${P.esc(x.kelas)}</b></td><td data-label="Guru kelas">${P.esc(P.namaPendek(x.guru_kelas || ""))}</td>
-        <td class="angka" data-label="Enrolmen">${x.enrolmen}</td><td class="angka" data-label="Hari ditanda">${x.hari_ditanda}</td>
-        <td class="angka" data-label="TH">${x.tidak_hadir}</td><td class="angka" data-label="Tanpa sebab">${x.tanpa_sebab}</td>
-        <td class="angka" data-label="Lewat">${x.lewat}</td>
-        <td class="angka" data-label="% Hadir"><b style="color:${x.peratus_hadir === null ? "var(--teks-2)" : x.peratus_hadir < 90 ? "var(--merah)" : x.peratus_hadir < 95 ? "var(--oren)" : "var(--hijau)"}">${x.peratus_hadir === null ? "—" : x.peratus_hadir + "%"}</b></td></tr>`).join("");
-      $("#jLapMurid").innerHTML = lapMurid.length ? lapMurid.map(x => `<tr>
-        <td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid)}</b></td><td data-label="Kelas">${P.esc(x.kelas)}</td>
-        <td class="angka" data-label="TH">${x.tidak_hadir}</td><td class="angka" data-label="Tanpa sebab">${x.tanpa_sebab ? `<b style="color:var(--merah)">${x.tanpa_sebab}</b>` : 0}</td>
-        <td class="angka" data-label="Lewat">${x.lewat}</td><td class="angka" data-label="Ponteng kelas">${x.ponteng_kelas}</td></tr>`).join("")
-        : `<tr><td colspan="6" class="muat">Tiada rekod bagi bulan ini.</td></tr>`;
+        <td><b>${P.esc(x.kelas)}</b><small>${x.enrolmen} murid · ${P.esc(P.namaPendek(x.guru_kelas || "—"))}</small></td>
+        <td class="angka">${x.hari_ditanda}</td><td class="angka">${x.tidak_hadir}</td>
+        <td class="angka">${x.tanpa_sebab ? `<b style="color:var(--merah)">${x.tanpa_sebab}</b>` : 0}</td><td class="angka">${x.lewat}</td>
+        <td class="angka"><b style="color:${x.peratus_hadir === null ? "var(--teks-2)" : x.peratus_hadir < 90 ? "var(--merah)" : x.peratus_hadir < 95 ? "var(--oren)" : "var(--hijau)"}">${x.peratus_hadir === null ? "—" : x.peratus_hadir + "%"}</b></td></tr>`).join("");
+      $("#jLapMurid").innerHTML = lapMurid.length ? lapMurid.slice(0, 200).map(x => `<tr>
+        <td>${P.pautMurid(x.murid_id, x.murid)}<small>${P.esc(x.kelas)}</small></td>
+        <td class="angka">${x.tidak_hadir}</td><td class="angka">${x.tanpa_sebab ? `<b style="color:var(--merah)">${x.tanpa_sebab}</b>` : 0}</td>
+        <td class="angka">${x.lewat}</td><td class="angka">${x.ponteng_kelas}</td></tr>`).join("") +
+        (lapMurid.length > 200 ? `<tr><td colspan="5" class="muat">200 teratas daripada ${lapMurid.length} murid. Senarai penuh: CSV murid.</td></tr>` : "")
+        : `<tr><td colspan="5" class="muat">Tiada rekod bagi bulan ini.</td></tr>`;
       lukisLaporanTerperinci({ harian, sebab, sesi, y, m });
     } catch (e) { ralat("#jLapKelas", e, 8); }
   }
