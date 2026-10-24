@@ -709,12 +709,12 @@
       };
       const baris = m.map(x => {
         const bilTh = L.hari.filter(t => (peta[x.id + t] || {}).status === "TIDAK_HADIR").length;
-        return `<tr><td>${P.pautMurid(x.id, x.nama)}</td>${k.sel.map((s, i) => sel(x.id, s, L.hari[i])).join("")}<td class="${bilTh ? "lm-th" : ""}">${bilTh || ""}</td></tr>`;
+        return `<tr><td style="white-space:normal;overflow-wrap:anywhere;font-size:12.5px;line-height:1.35">${P.pautMurid(x.id, x.nama)}</td>${k.sel.map((s, i) => sel(x.id, s, L.hari[i])).join("")}<td class="${bilTh ? "lm-th" : ""}">${bilTh || ""}</td></tr>`;
       }).join("");
       $("#lmButiran").innerHTML = `<div class="kad" style="margin:0;background:var(--latar)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
         <h2 style="margin:0;font-size:15px">${P.esc(k.kelas)} · ${P.tarikhCantik(L.hari[0])} – ${P.tarikhCantik(L.hari[4])}</h2><button class="btn garis kecil tiada-cetak" id="lmTutup" type="button">Tutup</button></div>
         <p class="nota" style="margin:4px 0 8px">${m.length} murid · ✓ hadir · <b style="color:var(--merah)">TH</b> tidak hadir · <b style="color:var(--oren)">L</b> lewat · — belum ditanda · C cuti</p>
-        <div class="jadual-bungkus"><table class="lm lm-murid"><thead><tr><th>Murid</th>${L.hari.map((t, i) => `<th>${HARI_LM[i][0]}<small>${+t.slice(8, 10)}</small></th>`).join("")}<th>TH</th></tr></thead>
+        <div class="jadual-bungkus"><table class="lm lm-murid"><thead><tr><th style="width:44%">Murid</th>${L.hari.map((t, i) => `<th>${HARI_LM[i][0]}<small>${+t.slice(8, 10)}</small></th>`).join("")}<th>TH</th></tr></thead>
         <tbody>${baris || `<tr><td colspan="7" class="muat">Tiada murid.</td></tr>`}</tbody></table></div></div>`;
       $("#lmTutup").addEventListener("click", () => ($("#lmButiran").innerHTML = ""));
       $("#lmButiran").scrollIntoView({ behavior: "smooth", block: "start" });
