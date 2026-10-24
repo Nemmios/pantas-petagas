@@ -145,3 +145,15 @@ footer { text-align: center; color: var(--teks-2); font-size: 12.5px; padding: 1
 @media (max-width: 420px) { .baris { flex-direction: column; gap: 0; } }
 .alat > div.alat-btn { min-width: auto; flex: 0 0 auto; }
 td select { min-width: 140px; padding: 8px 10px; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .pintu a .ikon { color: var(--emas); }
+}
+.cip { display: inline-block; white-space: nowrap; }
+@media (max-width: 640px) {
+  table.kad-mobile thead { display: none; }
+  table.kad-mobile tr { display: block; border-bottom: 1px solid var(--garis); padding: 10px 0; }
+  table.kad-mobile td { display: flex; gap: 10px; align-items: baseline; border: 0; padding: 3px 0; text-align: left; }
+  table.kad-mobile td::before { content: attr(data-label); flex: 0 0 78px; color: var(--teks-2); font-size: 12.5px; font-weight: 600; }
+  table.kad-mobile td[data-label=""]::before { content: none; }
+  table.kad-mobile td.angka { text-align: left; }
+}
