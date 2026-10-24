@@ -86,8 +86,8 @@
       </div>
       <div class="kad">
         <h2>Surat telah dikeluarkan (tahun ini)</h2>
-        <div class="jadual-bungkus"><table>
-          <thead><tr><th>Ruj. Kami</th><th>Tarikh</th><th>Murid</th><th>Kelas</th><th>Jenis</th><th>Surat</th></tr></thead>
+        <div class="jadual-bungkus"><table class="kad-mobile">
+          <thead><tr><th>Ruj. Kami</th><th>Tarikh</th><th>Murid</th><th>Kelas</th><th>Jenis</th><th>Surat</th><th></th></tr></thead>
           <tbody id="jSurat"></tbody></table></div>
       </div>
     </div>
@@ -117,6 +117,7 @@
 </main>
 
 <script src="pantas.js"></script>
+<script src="surat.js"></script>
 <script>
 (() => {
   const P = PANTAS, $ = s => document.querySelector(s);
@@ -238,35 +239,63 @@
       const tahun = P.hariIni().slice(0, 4);
       const [calon, surat] = await Promise.all([
         P.db.rpc("calon_surat_amaran"),
-        P.db.pilih("surat_amaran", `select=id,jenis,peringkat,no_siri,tarikh_surat,murid(nama,kelas(nama))&tarikh_surat=gte.${tahun}-01-01&order=tarikh_surat.desc,id.desc`),
+        P.db.pilih("surat_amaran", `select=id,murid_id,jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir,murid(nama,kelas(nama))&tarikh_surat=gte.${tahun}-01-01&order=tarikh_surat.desc,id.desc`),
       ]);
       $("#jCalon").innerHTML = calon.length ? calon.map((c, i) => `<tr>
         <td data-label="Murid"><b>${P.esc(c.murid)}</b></td><td data-label="Kelas">${P.esc(c.kelas)}</td><td data-label="Jenis">${huruf(c.jenis)}</td>
         <td data-label="Surat"><span class="cip ${c.peringkat === 3 ? "th" : c.peringkat === 2 ? "lw" : "info"}">${PERINGKAT[c.peringkat]}</span></td>
         <td class="angka" data-label="Hari">${c.bil_hari}</td>
         <td data-label="Tarikh"><small>${c.tarikh.map(t => P.tarikhCantik(t)).join(", ")}</small></td>
-        <td data-label=""><button class="btn utama kecil b-keluar" data-i="${i}">Rekod dikeluarkan</button></td></tr>`).join("")
+        <td data-label=""><button class="btn utama kecil b-keluar" data-i="${i}">Rekod & jana surat</button></td></tr>`).join("")
         : `<tr><td colspan="7" class="muat">Tiada calon surat amaran buat masa ini.</td></tr>`;
       $("#jCalon")._calon = calon;
-      $("#jSurat").innerHTML = surat.length ? surat.map(s => `<tr>
-        <td>SMKG.700-7/2/2/${s.peringkat} (${s.no_siri})</td><td>${P.tarikhCantik(s.tarikh_surat)}</td>
-        <td>${P.esc(s.murid && s.murid.nama)}</td><td>${P.esc(s.murid && s.murid.kelas && s.murid.kelas.nama)}</td>
-        <td>${huruf(s.jenis)}</td><td>${PERINGKAT[s.peringkat]}</td></tr>`).join("")
-        : `<tr><td colspan="6" class="muat">Belum ada surat dikeluarkan.</td></tr>`;
+      $("#jSurat")._surat = surat;
+      $("#jSurat").innerHTML = surat.length ? surat.map((s, i) => `<tr>
+        <td data-label="Ruj.">SMKG.700-7/2/2/${s.peringkat} (${s.no_siri})</td><td data-label="Tarikh">${P.tarikhCantik(s.tarikh_surat)}</td>
+        <td data-label="Murid"><b>${P.esc(s.murid && s.murid.nama)}</b></td><td data-label="Kelas">${P.esc(s.murid && s.murid.kelas && s.murid.kelas.nama)}</td>
+        <td data-label="Jenis">${huruf(s.jenis)}</td><td data-label="Surat">${PERINGKAT[s.peringkat]}</td>
+        <td data-label=""><button class="btn garis kecil b-word" data-i="${i}">⬇ Word</button></td></tr>`).join("")
+        : `<tr><td colspan="7" class="muat">Belum ada surat dikeluarkan.</td></tr>`;
     } catch (e) { ralat("#jCalon", e); }
   }
   $("#jCalon").addEventListener("click", async e => {
     const b = e.target.closest(".b-keluar"); if (!b) return;
     const c = $("#jCalon")._calon[+b.dataset.i];
-    if (!confirm(`Rekod ${PERINGKAT[c.peringkat]} (${huruf(c.jenis)}) untuk ${c.murid}?`)) return;
+    if (!confirm(`Rekod & jana ${PERINGKAT[c.peringkat]} (${huruf(c.jenis)}) untuk ${c.murid}?`)) return;
     b.disabled = true;
     try {
       const siri = await P.db.rpc("no_siri_seterusnya", { p_jenis: c.jenis, p_peringkat: c.peringkat });
-      await P.db.tambah("surat_amaran", [{ murid_id: c.murid_id, jenis: c.jenis, peringkat: c.peringkat, no_siri: siri,
-        tarikh_tidak_hadir: c.tarikh, dikeluarkan_oleh: saya.id }]);
-      P.toast(`Direkod: SMKG.700-7/2/2/${c.peringkat} (${siri})`); muatSurat();
+      const rekod = { murid_id: c.murid_id, jenis: c.jenis, peringkat: c.peringkat, no_siri: siri,
+        tarikh_surat: P.hariIni(), tarikh_tidak_hadir: c.tarikh };
+      await P.db.tambah("surat_amaran", [{ ...rekod, dikeluarkan_oleh: saya.id }]);
+      P.toast(`Direkod: SMKG.700-7/2/2/${c.peringkat} (${siri}). Menjana surat…`);
+      await janaSurat(rekod);
+      muatSurat();
     } catch (err) { P.toast(err.message, "ralat"); b.disabled = false; }
   });
+  $("#jSurat").addEventListener("click", async e => {
+    const b = e.target.closest(".b-word"); if (!b) return;
+    const s = $("#jSurat")._surat[+b.dataset.i];
+    b.disabled = true;
+    try { await janaSurat(s); } catch (err) { P.toast(err.message, "ralat"); } finally { b.disabled = false; }
+  });
+
+  async function janaSurat(rekod) {
+    const [m, pj, dulu] = await Promise.all([
+      P.db.pilih("murid", `select=nama,no_kp,alamat,kelas(nama)&id=eq.${P.q(rekod.murid_id)}`),
+      P.db.pilih("murid_penjaga", `select=penjaga(nama,hubungan)&murid_id=eq.${P.q(rekod.murid_id)}`),
+      rekod.peringkat === 3 ? P.db.pilih("surat_amaran",
+        `select=peringkat,no_siri,tarikh_surat&murid_id=eq.${P.q(rekod.murid_id)}&jenis=eq.${rekod.jenis}&peringkat=lt.3&order=tarikh_surat.desc`) : [],
+    ]);
+    if (!m.length) throw new Error("Rekod murid tidak dijumpai.");
+    const penjaga = pj.map(x => x.penjaga).filter(x => x && x.nama);
+    const utama = penjaga.find(x => /BAPA/i.test(x.hubungan || "")) || penjaga[0];
+    const d = { ...rekod, murid: { nama: m[0].nama, no_kp: m[0].no_kp, alamat: m[0].alamat, kelas: m[0].kelas && m[0].kelas.nama },
+      penjaga: utama ? utama.nama : null, terdahulu: dulu };
+    const blob = await SURAT.jana(d);
+    SURAT.muatTurun(blob, SURAT.namaFail(d));
+    P.toast("Surat dimuat turun");
+  }
 
   // ---------- tetapan ----------
   async function muatTetapan() {
