@@ -81,6 +81,7 @@ textarea { min-height: 70px; resize: vertical; }
 /* senarai murid (tanda kehadiran) */
 .ringkasan { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
 .cip { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--latar); border: 1px solid var(--garis); }
+button.cip { color: var(--teks); font-family: inherit; line-height: 1.3; }
 .cip.th { background: var(--merah-lembut); color: var(--merah); border-color: transparent; }
 .cip.lw { background: var(--oren-lembut); color: var(--oren); border-color: transparent; }
 .cip.ok { background: var(--hijau-lembut); color: var(--hijau); border-color: transparent; }
