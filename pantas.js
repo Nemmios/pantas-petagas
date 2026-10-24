@@ -53,6 +53,7 @@ const PANTAS = (() => {
     if (/Email not confirmed/i.test(m)) return "E-mel belum disahkan. Semak peti masuk e-mel anda.";
     if (/User already registered/i.test(m)) return "E-mel ini sudah berdaftar. Sila log masuk.";
     if (/Password should be at least/i.test(m)) return "Kata laluan mesti sekurang-kurangnya 6 aksara.";
+    if (/should be different from the old/i.test(m)) return "Kata laluan baharu mesti berbeza daripada kata laluan lama.";
     if (/JWT expired/i.test(m)) return "Sesi tamat. Sila log masuk semula.";
     if (/permission denied|row-level security/i.test(m)) return "Tiada kebenaran untuk tindakan ini.";
     if (/Failed to fetch|NetworkError/i.test(m)) return "Tiada sambungan internet. Cuba lagi.";
@@ -123,12 +124,66 @@ const PANTAS = (() => {
       try { await fetch(`${URL_SB}/auth/v1/logout`, { method: "POST", headers: kepala() }); } catch {}
       setSesi(null);
     },
+    get perluTukar() { return !!(sesi && sesi.user && sesi.user.user_metadata && sesi.user.user_metadata.perlu_tukar); },
+    async tukarKata(baru) {
+      await segarkan();
+      const r = await fetch(`${URL_SB}/auth/v1/user`, { method: "PUT", headers: kepala(),
+        body: JSON.stringify({ password: baru, data: { perlu_tukar: false } }) })
+        .catch(e => { throw new Error(terjemahRalat(e.message)); });
+      if (!r.ok) await bacaRalat(r);
+      const u = await r.json();
+      if (sesi) { sesi.user = u && u.id ? u : { ...sesi.user, user_metadata: { ...(sesi.user.user_metadata || {}), perlu_tukar: false } }; simpan.set(KUNCI_SESI, sesi); }
+    },
     async pengguna() {
       if (!sesi) return null;
       const r = await db.pilih("pengguna", `select=id,nama,peranan,kelas_id&id=eq.${sesi.user.id}`);
+      if (this.perluTukar) await dialogTukarKata(true);     // kata laluan sementara daripada admin
       return r && r[0] ? r[0] : null;
     },
   };
+
+  // ---------- dialog kata laluan ----------
+  function tirai(html) {
+    const t = el(`<div class="tirai" role="dialog" aria-modal="true"><div class="kad dialog">${html}</div></div>`);
+    document.body.appendChild(t); return t;
+  }
+  function dialogTukarKata(wajib = false) {
+    return new Promise(selesai => {
+      const t = tirai(`<h2>${wajib ? "Tetapkan kata laluan baharu" : "Tukar kata laluan"}</h2>
+        <p class="nota">${wajib ? "Anda log masuk dengan kata laluan sementara. Sila tetapkan kata laluan baharu anda sendiri sebelum meneruskan." : "Kata laluan baharu sekurang-kurangnya 6 aksara."}</p>
+        <label for="tkBaru">Kata laluan baharu</label><input id="tkBaru" type="password" autocomplete="new-password" minlength="6">
+        <label for="tkUlang">Ulang kata laluan baharu</label><input id="tkUlang" type="password" autocomplete="new-password" minlength="6">
+        <div class="tk-mesej"></div>
+        <button class="btn utama penuh tk-simpan" type="button">Simpan kata laluan</button>
+        ${wajib ? "" : `<button class="btn garis penuh tk-batal" type="button" style="margin-top:8px">Batal</button>`}`);
+      const mesej = m => (t.querySelector(".tk-mesej").innerHTML = m ? `<div class="mesej ralat">${esc(m)}</div>` : "");
+      t.querySelector("#tkBaru").focus();
+      t.querySelector(".tk-simpan").addEventListener("click", async () => {
+        const a = t.querySelector("#tkBaru").value, b = t.querySelector("#tkUlang").value;
+        if (a.length < 6) return mesej("Kata laluan mesti sekurang-kurangnya 6 aksara.");
+        if (a !== b) return mesej("Kedua-dua kata laluan tidak sama.");
+        const btn = t.querySelector(".tk-simpan"); btn.disabled = true;
+        try { await auth.tukarKata(a); t.remove(); toast("Kata laluan baharu disimpan"); selesai(true); }
+        catch (e) { mesej(e.message); btn.disabled = false; }
+      });
+      const batal = t.querySelector(".tk-batal");
+      if (batal) batal.addEventListener("click", () => { t.remove(); selesai(false); });
+    });
+  }
+  function dialogLupaKata(emel = "") {
+    const teks = `Assalamualaikum. Saya ${emel ? `(${emel}) ` : ""}terlupa kata laluan PANTAS Petagas. Mohon set semula. Terima kasih.`;
+    const t = tirai(`<h2>Lupa kata laluan?</h2>
+      <p class="nota">Hubungi <b>Admin PANTAS</b> sekolah. Admin akan memberi anda <b>kata laluan sementara</b>.
+        Selepas log masuk dengannya, anda akan diminta menetapkan kata laluan baharu sendiri.</p>
+      <textarea rows="4" readonly>${esc(teks)}</textarea>
+      <div class="baris" style="margin-top:10px">
+        <button class="btn garis lk-salin" type="button">Salin mesej</button>
+        <a class="btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(teks)}">WhatsApp</a>
+      </div>
+      <button class="btn garis penuh lk-tutup" type="button" style="margin-top:10px">Tutup</button>`);
+    t.querySelector(".lk-salin").addEventListener("click", () => salin(teks).then(() => toast("Mesej disalin")));
+    t.querySelector(".lk-tutup").addEventListener("click", () => t.remove());
+  }
 
   // ---------- utiliti ----------
   function hariIni() {
@@ -184,5 +239,5 @@ const PANTAS = (() => {
   }
 
   return { URL_SB, KUNCI, db, auth, q, simpan, hariIni, tambahHari, tarikhCantik, sesiSekarang,
-           el, esc, namaPendek, toast, salin, telWa, muatTurunCsv, pautMurid };
+           el, esc, namaPendek, toast, salin, telWa, muatTurunCsv, pautMurid, dialogTukarKata, dialogLupaKata };
 })();

@@ -27,6 +27,7 @@
       <input id="kata" type="password" autocomplete="current-password" minlength="6" required>
       <div id="mMasuk"></div>
       <button class="btn utama penuh" id="bMasuk">Log masuk</button>
+      <p style="text-align:center;margin:14px 0 0"><button type="button" class="pautan-kecil" id="bLupa">Lupa kata laluan?</button></p>
     </form>
   </section>
 
@@ -138,6 +139,7 @@
         <div id="pkSaya" class="muat">Memuatkan…</div>
       </div>
     </div>
+    <p class="tiada-cetak" style="text-align:center;margin:18px 0 8px"><button type="button" class="btn garis kecil" id="bTukarKata">🔑 Tukar kata laluan</button></p>
   </section>
 </main>
 
@@ -178,6 +180,9 @@
   });
 
   $("#bKeluar").addEventListener("click", async () => { await P.auth.keluar(); location.reload(); });
+  $("#bLupa").addEventListener("click", () => P.dialogLupaKata($("#emel").value.trim()));
+  $("#bTukarKata").addEventListener("click", () => P.dialogTukarKata(false));
+
 
   // ---------- mula ----------
   async function mula() {

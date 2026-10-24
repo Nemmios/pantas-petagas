@@ -185,6 +185,10 @@ a.pautan-murid { color: inherit; text-decoration: underline; text-decoration-col
 .hasil-cari a { display: flex; justify-content: space-between; gap: 10px; padding: 11px 4px; border-bottom: 1px solid var(--garis);
   color: var(--teks); text-decoration: none; font-size: 14.5px; }
 .hasil-cari a small { color: var(--teks-2); white-space: nowrap; }
+/* dialog */
+.tirai { position: fixed; inset: 0; background: rgba(10, 15, 25, .6); z-index: 40; display: grid; place-items: center; padding: 16px; overflow-y: auto; }
+.tirai .dialog { width: 100%; max-width: 420px; margin: 0; }
+.pautan-kecil { background: none; border: 0; padding: 0; font: inherit; font-size: 14px; color: var(--biru-muda); text-decoration: underline; cursor: pointer; }
 @media print {
   .kepala button, .kepala .anak-panah, .tab, .alat, .tiada-cetak, #toast { display: none !important; }
   .kepala { position: static; background: #fff; color: #000; border-bottom: 2px solid #000; }

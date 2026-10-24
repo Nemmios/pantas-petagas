@@ -24,6 +24,7 @@
       <label for="kata">Kata laluan</label><input id="kata" type="password" autocomplete="current-password" required>
       <div id="mMasuk"></div>
       <button class="btn utama penuh" id="bMasuk">Log masuk</button>
+      <p style="text-align:center;margin:14px 0 0"><button type="button" class="pautan-kecil" id="bLupa">Lupa kata laluan?</button></p>
     </form>
   </section>
 
@@ -146,9 +147,10 @@
       <div class="kad">
         <h2>Pengguna sistem</h2>
         <p class="nota">Luluskan guru yang mendaftar, dan tetapkan peranan. Guru kelas perlu dipadankan dengan kelasnya. Hanya ADMIN boleh mengubah.</p>
-        <div class="jadual-bungkus"><table>
+        <div class="jadual-bungkus"><table class="kad-mobile">
           <thead><tr><th>Nama</th><th>Peranan</th><th>Kelas (guru kelas)</th><th></th></tr></thead>
           <tbody id="jPengguna"></tbody></table></div>
+        <p class="nota" style="margin:10px 0 0">🔑 <b>Set semula</b>: untuk guru yang lupa kata laluan. Sistem memberi kata laluan sementara; guru wajib menukarnya selepas log masuk.</p>
       </div>
       <div class="kad">
         <h2>Takwim cuti</h2>
@@ -170,6 +172,7 @@
         <div id="mSandaran"></div>
       </div>
     </div>
+    <p class="tiada-cetak" style="text-align:center;margin:18px 0 8px"><button type="button" class="btn garis kecil" id="bTukarKata">🔑 Tukar kata laluan</button></p>
   </section>
 </main>
 
@@ -194,6 +197,8 @@
     finally { $("#bMasuk").disabled = false; }
   });
   $("#bKeluar").addEventListener("click", async () => { await P.auth.keluar(); location.reload(); });
+  $("#bLupa").addEventListener("click", () => P.dialogLupaKata($("#emel").value.trim()));
+  $("#bTukarKata").addEventListener("click", () => P.dialogTukarKata(false));
 
   // ---------- susulan ----------
   const JENIS_SUS = { PANGGILAN: "Panggilan telefon", WHATSAPP: "WhatsApp", LAMPIRAN_DITERIMA: "Jawapan / lampiran diterima",
@@ -331,6 +336,7 @@
     document.querySelectorAll("#tabUtama button").forEach(x => x.classList.toggle("aktif", x === b));
     $("#kTarikh").classList.toggle("tersembunyi", paparan === "laporan");
     $("#kBulan").classList.toggle("tersembunyi", paparan !== "laporan");
+    document.querySelector(".kad.alat").classList.toggle("tersembunyi", paparan === "tetapan");
     ["harian", "idme", "surat", "ponteng", "laporan", "tetapan"].forEach(v => {
       const el = $("#p" + v[0].toUpperCase() + v.slice(1)); if (el) el.classList.toggle("tersembunyi", v !== paparan);
     });
@@ -543,23 +549,40 @@
         P.db.pilih("takwim_cuti", `select=tarikh,keterangan&tarikh=gte.${P.hariIni().slice(0, 4)}-01-01&order=tarikh`),
       ]);
       const PER = ["MENUNGGU", "GURU", "GURU_KELAS", "PETUGAS", "HEM", "ADMIN"];
-      $("#jPengguna").innerHTML = pengguna.map(u => `<tr data-id="${u.id}">
-        <td>${P.esc(u.nama)}${u.peranan === "MENUNGGU" ? ` <span class="cip th">Baharu</span>` : ""}</td>
-        <td><select class="u-per" ${admin ? "" : "disabled"}>${PER.map(p => `<option ${p === u.peranan ? "selected" : ""}>${p}</option>`).join("")}</select></td>
-        <td><select class="u-kelas" ${admin ? "" : "disabled"}><option value="">—</option>${kelas.map(k => `<option value="${k.id}" ${k.id === u.kelas_id ? "selected" : ""}>${P.esc(k.nama)}${k.guru_kelas ? " · " + P.esc(P.namaPendek(k.guru_kelas)) : ""}</option>`).join("")}</select></td>
-        <td>${admin ? `<button class="btn utama kecil u-simpan">Simpan</button>` : ""}</td></tr>`).join("");
+      $("#jPengguna").innerHTML = pengguna.map(u => `<tr data-id="${u.id}" data-nama="${P.esc(u.nama)}">
+        <td data-label="Nama"><b>${P.esc(u.nama)}</b>${u.peranan === "MENUNGGU" ? ` <span class="cip th">Baharu</span>` : ""}${u.id === saya.id ? ` <span class="cip">Anda</span>` : ""}</td>
+        <td data-label="Peranan"><select class="u-per" ${admin ? "" : "disabled"}>${PER.map(p => `<option ${p === u.peranan ? "selected" : ""}>${p}</option>`).join("")}</select></td>
+        <td data-label="Kelas"><select class="u-kelas" ${admin ? "" : "disabled"}><option value="">—</option>${kelas.map(k => `<option value="${k.id}" ${k.id === u.kelas_id ? "selected" : ""}>${P.esc(k.nama)}${k.guru_kelas ? " · " + P.esc(P.namaPendek(k.guru_kelas)) : ""}</option>`).join("")}</select></td>
+        <td data-label="">${admin ? `<div style="width:100%"><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn utama kecil u-simpan">Simpan</button>${u.id !== saya.id ? `<button class="btn garis kecil u-set">🔑 Set semula</button>` : ""}</span><div class="u-hasil"></div></div>` : ""}</td></tr>`).join("");
       $("#jCuti").innerHTML = cuti.length ? cuti.map(c => `<tr><td>${P.tarikhCantik(c.tarikh, true)}</td><td>${P.esc(c.keterangan || "")}</td>
         <td style="text-align:right"><button class="btn garis kecil c-buang" data-t="${c.tarikh}">Buang</button></td></tr>`).join("")
         : `<tr><td class="muat">Belum ada hari cuti direkodkan untuk tahun ini.</td></tr>`;
     } catch (e) { ralat("#jPengguna", e, 4); }
   }
   $("#jPengguna").addEventListener("click", async e => {
+    if (e.target.classList.contains("u-set")) return setSemula(e.target);
+    if (e.target.classList.contains("u-salin")) return P.salin(e.target.dataset.teks).then(() => P.toast("Mesej disalin"));
     if (!e.target.classList.contains("u-simpan")) return;
     const tr = e.target.closest("tr"), per = tr.querySelector(".u-per").value, kid = tr.querySelector(".u-kelas").value;
     if (per === "GURU_KELAS" && !kid) return P.toast("Pilih kelas untuk guru kelas", "ralat");
     try { await P.db.kemaskini("pengguna", `id=eq.${tr.dataset.id}`, { peranan: per, kelas_id: kid ? +kid : null }); P.toast("Disimpan"); muatTetapan(); }
     catch (err) { P.toast(err.message, "ralat"); }
   });
+  async function setSemula(btn) {
+    const tr = btn.closest("tr"), nama = tr.dataset.nama;
+    if (!confirm(`Set semula kata laluan ${nama}?\n\nKata laluan lama tidak boleh digunakan lagi dan akaun ini akan dilog keluar daripada semua peranti.`)) return;
+    btn.disabled = true;
+    try {
+      const kata = await P.db.rpc("tetap_semula_kata_laluan", { p_pengguna: tr.dataset.id });
+      const pautan = new URL("guru.html", location.href).href;
+      const teks = `Assalamualaikum ${P.namaPendek(nama)}. Kata laluan sementara PANTAS Petagas anda: ${kata}\n\nLog masuk di ${pautan} dengan e-mel DELIMa anda dan kata laluan ini. Anda akan diminta menetapkan kata laluan baharu sendiri.`;
+      tr.querySelector(".u-hasil").innerHTML = `<div class="mesej ok" style="margin:8px 0 0">Kata laluan sementara: <b style="font-size:17px;letter-spacing:1px">${P.esc(kata)}</b>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="btn garis kecil u-salin" data-teks="${P.esc(teks)}">Salin mesej</button>
+        <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(teks)}">WhatsApp</a></div>
+        <small style="display:block;margin-top:6px">Kata laluan ini hanya dipaparkan sekali.</small></div>`;
+    } catch (err) { P.toast(err.message, "ralat"); }
+    finally { btn.disabled = false; }
+  }
   $("#bCuti").addEventListener("click", async () => {
     const d = $("#cTarikh").value, a = $("#cAkhir").value || d, ket = $("#cKet").value.trim();
     if (!d) return P.toast("Pilih tarikh", "ralat");
