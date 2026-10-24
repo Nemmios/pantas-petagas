@@ -265,7 +265,7 @@
     $("#tajukLaporan").textContent = `Laporan kehadiran ${NAMA_BULAN[m - 1]} ${y}`;
     $("#jLapKelas").innerHTML = `<tr><td colspan="8" class="muat">Memuatkan…</td></tr>`;
     try {
-      const [k, mu] = await Promise.all([P.db.rpc("laporan_bulanan_kelas", { p_bulan: tarikh }), P.db.rpc("laporan_bulanan_murid", { p_bulan: tarikh })]);
+      const [k, mu] = await Promise.all([P.db.rpcSemua("laporan_bulanan_kelas", { p_bulan: tarikh }), P.db.rpcSemua("laporan_bulanan_murid", { p_bulan: tarikh })]);
       const sesi = $("#sesi").value;
       lapKelas = k.filter(x => !sesi || x.sesi === sesi); lapMurid = mu.filter(x => !sesi || x.sesi === sesi);
       const jum = f => lapKelas.reduce((a, x) => a + (x[f] || 0), 0);
@@ -428,7 +428,7 @@
     try {
       const tahun = P.hariIni().slice(0, 4);
       const [calon, surat] = await Promise.all([
-        P.db.rpc("calon_surat_amaran"),
+        P.db.rpcSemua("calon_surat_amaran"),
         P.db.pilih("surat_amaran", `select=id,murid_id,jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir,murid(nama,kelas(nama))&tarikh_surat=gte.${tahun}-01-01&order=tarikh_surat.desc,id.desc`),
       ]);
       $("#jCalon").innerHTML = calon.length ? calon.map((c, i) => `<tr>

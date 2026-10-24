@@ -73,8 +73,21 @@ const PANTAS = (() => {
     return t ? JSON.parse(t) : null;
   }
   const q = encodeURIComponent;
+  // Supabase menghadkan 1,000 baris setiap permintaan — ambil berperingkat sehingga habis
+  const SAIZ = 1000;
+  async function semuaHalaman(laluan, opts = {}) {
+    const hasil = [], sambung = laluan.includes("?") ? "&" : "?";
+    for (let mula = 0; mula < 50 * SAIZ; mula += SAIZ) {
+      const r = await api(`${laluan}${sambung}limit=${SAIZ}&offset=${mula}`, opts);
+      if (!Array.isArray(r)) return r;
+      hasil.push(...r);
+      if (r.length < SAIZ) break;
+    }
+    return hasil;
+  }
   const db = {
-    pilih: (jadual, query = "") => api(`${jadual}?${query}`),
+    pilih: (jadual, query = "") => /(^|&)limit=/.test(query) ? api(`${jadual}?${query}`) : semuaHalaman(`${jadual}?${query}`),
+    rpcSemua: (fn, arg = {}) => semuaHalaman(`rpc/${fn}`, { method: "POST", body: arg }),
     tambah: (jadual, baris) => api(jadual, { method: "POST", body: baris, prefer: "return=minimal" }),
     upsert: (jadual, baris, konflik, abaikan = false) =>
       api(`${jadual}?on_conflict=${konflik}`, { method: "POST", body: baris,
