@@ -43,6 +43,7 @@
       <button class="aktif" data-v="tanda">Tanda kehadiran</button>
       <button data-v="ponteng">Ponteng kelas</button>
       <button data-v="kelasku" id="tKelasku" class="tersembunyi">Kelas saya</button>
+      <button data-v="aktiviti">Aktiviti</button>
       <button data-v="laporan">Laporan</button>
       <button data-v="profil" id="tProfil">Profil murid</button>
     </div>
@@ -116,6 +117,49 @@
       </div>
     </div>
 
+    <!-- MEMO AKTIVITI (semua guru) -->
+    <div id="pAktiviti" class="tersembunyi">
+      <div class="kad">
+        <h2>Aktiviti hari ini</h2>
+        <p class="nota">Murid yang terlibat aktiviti rasmi. Mereka tidak boleh dilapor ponteng semasa aktiviti.</p>
+        <div id="akHariIni" class="muat">Memuatkan…</div>
+      </div>
+      <div class="kad">
+        <h2>Cipta memo aktiviti</h2>
+        <p class="nota">Untuk guru penganjur: latihan sukan, perjumpaan pengawas, AJK TVPSS, program, wakil sekolah dan sebagainya.</p>
+        <label for="akNama">Nama aktiviti</label><input id="akNama" maxlength="100" placeholder="cth Latihan Olahraga">
+        <label for="akJenis">Jenis</label>
+        <select id="akJenis"><option value="DALAM">Dalam sekolah (semasa PdP)</option>
+          <option value="LUAR">Luar sekolah / wakil sekolah</option></select>
+        <div class="baris">
+          <div><label for="akMula">Tarikh mula</label><input id="akMula" type="date"></div>
+          <div><label for="akAkhir">Tarikh akhir</label><input id="akAkhir" type="date"></div>
+        </div>
+        <div id="akKWaktu">
+          <label class="semak"><input type="checkbox" id="akSepanjang"> Sepanjang hari</label>
+          <div class="baris" id="akJulat">
+            <div><label for="akWMula">Dari</label><select id="akWMula"></select></div>
+            <div><label for="akWAkhir">Hingga</label><select id="akWAkhir"></select></div>
+          </div>
+        </div>
+        <p class="mesej info tersembunyi" id="akNotaLuar" style="margin-top:12px">Sebab tidak hadir murid akan diisi automatik: <b>AKTIVITI LUAR SEKOLAH – WAKIL SEKOLAH</b>. Guru waktu pertama tetap menanda mereka TH.</p>
+        <label for="akLokasi">Lokasi (pilihan)</label><input id="akLokasi" maxlength="100" placeholder="cth Padang sekolah">
+        <label>Murid terlibat</label>
+        <div class="baris">
+          <div><select id="akSesi" aria-label="Sesi"><option value="PAGI">Pagi</option><option value="PETANG">Petang</option></select></div>
+          <div><select id="akKelas" aria-label="Kelas"></select></div>
+        </div>
+        <div id="akSenarai" style="margin-top:10px"></div>
+        <div id="akDipilih" style="margin-top:10px"></div>
+        <label for="akCatatan">Catatan (pilihan)</label><input id="akCatatan" maxlength="300">
+        <button class="btn emas penuh" id="bSimpanMemo" type="button">Simpan memo</button>
+      </div>
+      <div class="kad">
+        <h2>Memo saya</h2>
+        <div id="akSaya" class="muat">Memuatkan…</div>
+      </div>
+    </div>
+
     <!-- LAPORAN MINGGUAN (semua guru) -->
     <div id="pLaporan" class="tersembunyi">
       <div class="kad tiada-cetak">
@@ -173,7 +217,12 @@
 (() => {
   const P = PANTAS, $ = s => document.querySelector(s);
   const PAUTAN_BORANG = new URL("ibubapa.html", location.href).href;
-  let saya = null, semuaKelas = [], murid = [], tanda = {}, asal = {}, sebabIbuBapa = {}, kategoriSemua = [], sebabSemua = [];
+  let saya = null, semuaKelas = [], murid = [], tanda = {}, asal = {}, sebabIbuBapa = {}, aktivitiMurid = {}, kategoriSemua = [], sebabSemua = [];
+  // memo aktiviti yang meliputi tarikh (dan waktu) tertentu
+  const ambilMemo = (ids, tarikh) => ids.length ? P.db.pilih("memo_murid",
+    `select=murid_id,memo:memo_aktiviti!inner(nama,jenis,waktu_mula,waktu_akhir,guru_nama)&murid_id=${inList(ids)}&memo.tarikh_mula=lte.${tarikh}&memo.tarikh_akhir=gte.${tarikh}`) : Promise.resolve([]);
+  const teksWaktu = a => (a.jenis === "LUAR" ? "Luar sekolah" : a.waktu_mula == null ? "Sepanjang hari" : a.waktu_mula === a.waktu_akhir ? `Waktu ${a.waktu_mula}` : `Waktu ${a.waktu_mula}–${a.waktu_akhir}`);
+  const ikonMemo = a => (a.jenis === "LUAR" ? "🚌" : "🏃");
 
   const tunjuk = id => ["vMasuk", "vTunggu", "vApp"].forEach(x => $("#" + x).classList.toggle("tersembunyi", x !== id));
   const mesej = (sel, jenis, teks) => { $(sel).innerHTML = teks ? `<div class="mesej ${jenis}">${P.esc(teks)}</div>` : ""; };
@@ -346,11 +395,14 @@
       tanda = {}; asal = {}; sebabIbuBapa = {};
       if (murid.length) {
         const ids = inList(murid.map(m => m.id));
-        const [hadir, sebab, selesai] = await Promise.all([
+        const [hadir, sebab, selesai, memo] = await Promise.all([
           P.db.pilih("kehadiran", `select=murid_id,status&tarikh=eq.${tarikh}&murid_id=${ids}`),
           P.db.pilih("sebab_tidak_hadir", `select=murid_id,minta_jumpa,sumber,idme_sebab(nama)&murid_id=${ids}&tarikh_mula=lte.${tarikh}&tarikh_akhir=gte.${tarikh}&status=neq.DITOLAK&order=dihantar_pada.desc`),
           P.db.pilih("kelas_selesai", `select=pada&tarikh=eq.${tarikh}&kelas_id=eq.${kid}`),
+          ambilMemo(murid.map(m => m.id), tarikh),
         ]);
+        aktivitiMurid = {};
+        memo.forEach(x => { (aktivitiMurid[x.murid_id] = aktivitiMurid[x.murid_id] || []).push(`${ikonMemo(x.memo)} ${huruf(x.memo.nama)} · ${teksWaktu(x.memo)}`); });
         hadir.forEach(h => { tanda[h.murid_id] = h.status; asal[h.murid_id] = h.status; });
         sebab.forEach(s => { if (!sebabIbuBapa[s.murid_id]) sebabIbuBapa[s.murid_id] = s.minta_jumpa && !s.idme_sebab ? "Ibu bapa minta berbincang" : huruf(s.idme_sebab && s.idme_sebab.nama); });
         const st = $("#status");
@@ -365,7 +417,8 @@
     if (!murid.length) { $("#senarai").innerHTML = `<div class="muat">Tiada murid dalam kelas ini.</div>`; kemasRingkasan(); return; }
     $("#senarai").innerHTML = murid.map((m, i) => {
       const s = tanda[m.id], kls = s === "TIDAK_HADIR" ? "th" : s === "LEWAT" ? "lw" : "";
-      const nota = sebabIbuBapa[m.id] ? `<small>✓ ${P.esc(sebabIbuBapa[m.id])}</small>` : "";
+      const nota = (sebabIbuBapa[m.id] ? `<small>✓ ${P.esc(sebabIbuBapa[m.id])}</small>` : "") +
+        (aktivitiMurid[m.id] || []).map(t => `<small style="color:var(--oren)">${P.esc(t)}</small>`).join("");
       return `<div class="murid ${kls}" data-id="${P.esc(m.id)}">
         <span class="no">${i + 1}</span><span class="nama">${P.esc(m.nama)}${nota}</span>
         <span class="tindakan"><button class="b-th" data-s="TIDAK_HADIR" aria-label="Tidak hadir">TH</button><button class="b-lw" data-s="LEWAT" aria-label="Lewat">LW</button></span></div>`;
@@ -442,11 +495,105 @@
     $("#pKelasku").classList.toggle("tersembunyi", b.dataset.v !== "kelasku");
     $("#pPonteng").classList.toggle("tersembunyi", b.dataset.v !== "ponteng");
     $("#pLaporan").classList.toggle("tersembunyi", b.dataset.v !== "laporan");
-    $("#kJadual").classList.toggle("tersembunyi", ["kelasku", "laporan"].includes(b.dataset.v) || !jadualHari.length);
+    $("#pAktiviti").classList.toggle("tersembunyi", b.dataset.v !== "aktiviti");
+    $("#kJadual").classList.toggle("tersembunyi", ["kelasku", "laporan", "aktiviti"].includes(b.dataset.v) || !jadualHari.length);
+    if (b.dataset.v === "aktiviti") mulaAktiviti();
     if (b.dataset.v === "laporan") muatLaporan();
     if (b.dataset.v === "kelasku") muatKelasku();
     if (b.dataset.v === "ponteng") mulaPonteng();
   }));
+
+  // ---------- memo aktiviti ----------
+  let akMula = false; const akPilih = new Map();
+  function mulaAktiviti() {
+    if (!akMula) {
+      $("#akMula").value = $("#akAkhir").value = P.hariIni();
+      const opsyen = Array.from({ length: 15 }, (_, i) => `<option value="${i + 1}">Waktu ${i + 1}</option>`).join("");
+      $("#akWMula").innerHTML = $("#akWAkhir").innerHTML = opsyen;
+      $("#akSesi").value = P.sesiSekarang(); isiAkKelas(); akMula = true;
+    }
+    muatAktiviti();
+  }
+  function isiAkKelas() {
+    $("#akKelas").innerHTML = `<option value="">— Pilih kelas —</option>` +
+      semuaKelas.filter(k => k.sesi === $("#akSesi").value).map(k => `<option value="${k.id}">${P.esc(k.nama)}</option>`).join("");
+    $("#akSenarai").innerHTML = "";
+  }
+  $("#akSesi").addEventListener("change", isiAkKelas);
+  $("#akJenis").addEventListener("change", () => {
+    const luar = $("#akJenis").value === "LUAR";
+    $("#akKWaktu").classList.toggle("tersembunyi", luar); $("#akNotaLuar").classList.toggle("tersembunyi", !luar);
+  });
+  $("#akSepanjang").addEventListener("change", () => $("#akJulat").classList.toggle("tersembunyi", $("#akSepanjang").checked));
+  $("#akMula").addEventListener("change", () => { if ($("#akAkhir").value < $("#akMula").value) $("#akAkhir").value = $("#akMula").value; });
+  $("#akKelas").addEventListener("change", async () => {
+    const kid = +$("#akKelas").value, k = semuaKelas.find(x => x.id === kid); if (!kid) return ($("#akSenarai").innerHTML = "");
+    $("#akSenarai").innerHTML = `<div class="muat">Memuatkan…</div>`;
+    try {
+      const m = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
+      $("#akSenarai").innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><small class="nota" style="margin:0">${P.esc(k.nama)}: tanda murid terlibat</small>
+        <button type="button" class="pautan-kecil" id="akSemua">Pilih semua</button></div><div class="pilihan">` +
+        m.map(x => `<label class="item"><input type="checkbox" class="ak-m" value="${P.esc(x.id)}" data-nama="${P.esc(x.nama)}" data-kelas="${P.esc(k.nama)}" ${akPilih.has(x.id) ? "checked" : ""}><span>${P.esc(x.nama)}</span></label>`).join("") + `</div>`;
+      $("#akSemua").addEventListener("click", () => { document.querySelectorAll(".ak-m").forEach(c => { c.checked = true; akPilih.set(c.value, { nama: c.dataset.nama, kelas: c.dataset.kelas }); }); lukisDipilih(); });
+    } catch (e) { $("#akSenarai").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
+  });
+  $("#akSenarai").addEventListener("change", e => {
+    const c = e.target; if (!c.classList.contains("ak-m")) return;
+    if (c.checked) akPilih.set(c.value, { nama: c.dataset.nama, kelas: c.dataset.kelas }); else akPilih.delete(c.value);
+    lukisDipilih();
+  });
+  function lukisDipilih() {
+    $("#akDipilih").innerHTML = akPilih.size ? `<small class="nota">${akPilih.size} murid dipilih (tekan untuk buang):</small><div class="ringkasan" style="margin-top:4px">` +
+      [...akPilih].map(([id, x]) => `<button type="button" class="cip ak-buang" data-id="${P.esc(id)}" style="cursor:pointer">${P.esc(P.namaPendek(x.nama))} · ${P.esc(x.kelas)} ✕</button>`).join("") + `</div>` : "";
+  }
+  $("#akDipilih").addEventListener("click", e => {
+    const b = e.target.closest(".ak-buang"); if (!b) return;
+    akPilih.delete(b.dataset.id); const c = document.querySelector(`.ak-m[value="${CSS.escape(b.dataset.id)}"]`); if (c) c.checked = false; lukisDipilih();
+  });
+  $("#bSimpanMemo").addEventListener("click", async () => {
+    const luar = $("#akJenis").value === "LUAR", sepanjang = luar || $("#akSepanjang").checked;
+    const wm = +$("#akWMula").value, wa = +$("#akWAkhir").value;
+    if (!$("#akNama").value.trim()) return P.toast("Isi nama aktiviti", "ralat");
+    if (!akPilih.size) return P.toast("Pilih murid terlibat", "ralat");
+    if (!sepanjang && wa < wm) return P.toast("Waktu akhir mesti selepas waktu mula", "ralat");
+    $("#bSimpanMemo").disabled = true;
+    try {
+      await P.db.rpc("cipta_memo", { p_nama: $("#akNama").value, p_jenis: $("#akJenis").value, p_tarikh_mula: $("#akMula").value, p_tarikh_akhir: $("#akAkhir").value,
+        p_waktu_mula: sepanjang ? null : wm, p_waktu_akhir: sepanjang ? null : wa, p_lokasi: $("#akLokasi").value, p_catatan: $("#akCatatan").value, p_murid: [...akPilih.keys()] });
+      P.toast(`Memo disimpan · ${akPilih.size} murid`);
+      akPilih.clear(); lukisDipilih(); ["#akNama", "#akLokasi", "#akCatatan"].forEach(x => ($(x).value = "")); $("#akKelas").value = ""; $("#akSenarai").innerHTML = "";
+      muatAktiviti();
+    } catch (e) { P.toast(e.message, "ralat"); }
+    finally { $("#bSimpanMemo").disabled = false; }
+  });
+  function kadMemo(a, padam) {
+    const senarai = (a.memo_murid || []).map(x => x.murid).filter(Boolean).sort((p, q) => (p.kelas && p.kelas.nama || "").localeCompare(q.kelas && q.kelas.nama || "") || p.nama.localeCompare(q.nama));
+    const tarikh = a.tarikh_mula === a.tarikh_akhir ? P.tarikhCantik(a.tarikh_mula) : `${P.tarikhCantik(a.tarikh_mula)} – ${P.tarikhCantik(a.tarikh_akhir)}`;
+    return `<div class="murid" style="display:block"><div style="display:flex;gap:8px;align-items:flex-start">
+      <span class="nama"><b>${ikonMemo(a)} ${P.esc(huruf(a.nama))}</b>
+      <small style="color:var(--teks-2)">${tarikh} · ${P.esc(teksWaktu(a))}${a.lokasi ? " · " + P.esc(a.lokasi) : ""} · ${P.esc(P.namaPendek(a.guru_nama || ""))}</small></span>
+      ${padam ? `<button class="btn garis kecil ak-padam" data-id="${a.id}" type="button">Padam</button>` : ""}</div>
+      <details style="margin-top:4px"><summary style="cursor:pointer;font-size:13.5px;color:var(--biru-muda)">${senarai.length} murid</summary>
+      <div style="font-size:13.5px;margin-top:4px">${senarai.map(m => `${P.esc(m.nama)} <small style="color:var(--teks-2)">(${P.esc(m.kelas ? m.kelas.nama : "")})</small>`).join("<br>")}</div></details></div>`;
+  }
+  async function muatAktiviti() {
+    const kini = P.hariIni(), pilih = "select=id,nama,jenis,tarikh_mula,tarikh_akhir,waktu_mula,waktu_akhir,lokasi,guru_id,guru_nama,memo_murid(murid(nama,kelas(nama)))";
+    const urus = ["HEM", "ADMIN"].includes(saya.peranan);
+    try {
+      const [hari, milik] = await Promise.all([
+        P.db.pilih("memo_aktiviti", `${pilih}&tarikh_mula=lte.${kini}&tarikh_akhir=gte.${kini}&order=jenis,waktu_mula.nullsfirst`),
+        P.db.pilih("memo_aktiviti", `${pilih}&guru_id=eq.${saya.id}&tarikh_akhir=gte.${P.tambahHari(kini, -14)}&order=tarikh_mula.desc`)]);
+      $("#akHariIni").className = ""; $("#akSaya").className = "";
+      $("#akHariIni").innerHTML = hari.length ? hari.map(a => kadMemo(a, urus || a.guru_id === saya.id)).join("") : `<div class="muat">Tiada aktiviti hari ini.</div>`;
+      $("#akSaya").innerHTML = milik.length ? milik.map(a => kadMemo(a, true)).join("") : `<div class="muat">Anda belum mencipta memo.</div>`;
+    } catch (e) { $("#akHariIni").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
+  }
+  $("#pAktiviti").addEventListener("click", async e => {
+    const b = e.target.closest(".ak-padam"); if (!b) return;
+    if (!confirm("Padam memo ini? Sebab automatik (aktiviti luar) bagi murid terlibat juga akan dibuang.")) return;
+    try { await P.db.rpc("padam_memo", { p_id: +b.dataset.id }); P.toast("Memo dipadam"); muatAktiviti(); }
+    catch (err) { P.toast(err.message, "ralat"); }
+  });
 
   // ---------- laporan mingguan ----------
   const HARI_LM = ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat"];
@@ -666,19 +813,34 @@
     $("#pkSenarai").innerHTML = "";
   }
   $("#pkSesi").addEventListener("change", () => { isiPkKelas(); isiPkWaktu(waktuKini($("#pkSesi").value)); });
+  let pkData = null;
   $("#pkKelas").addEventListener("change", async () => {
     cadangSubjek();
-    const kid = +$("#pkKelas").value; if (!kid) { $("#pkSenarai").innerHTML = ""; return; }
+    const kid = +$("#pkKelas").value; pkData = null; if (!kid) { $("#pkSenarai").innerHTML = ""; return; }
     $("#pkSenarai").innerHTML = `<div class="muat">Memuatkan…</div>`;
     try {
       const m = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
-      const th = m.length ? await P.db.pilih("kehadiran", `select=murid_id&tarikh=eq.${P.hariIni()}&status=eq.TIDAK_HADIR&murid_id=${inList(m.map(x => x.id))}`) : [];
-      const tiada = new Set(th.map(x => x.murid_id));
-      $("#pkSenarai").innerHTML = `<p class="nota" style="margin:0 0 6px">Tanda murid yang <b>tiada</b> dalam kelas:</p><div class="pilihan">` + m.map(x => tiada.has(x.id)
-        ? `<label class="item" style="opacity:.55"><input type="checkbox" disabled><span>${P.esc(x.nama)}<small>Tidak hadir ke sekolah hari ini</small></span></label>`
-        : `<label class="item"><input type="checkbox" class="pk-m" value="${P.esc(x.id)}"><span>${P.esc(x.nama)}</span></label>`).join("") + `</div>`;
+      const ids = m.map(x => x.id);
+      const [th, memo] = await Promise.all([
+        ids.length ? P.db.pilih("kehadiran", `select=murid_id&tarikh=eq.${P.hariIni()}&status=eq.TIDAK_HADIR&murid_id=${inList(ids)}`) : [],
+        ambilMemo(ids, P.hariIni())]);
+      pkData = { m, tiada: new Set(th.map(x => x.murid_id)), memo };
+      lukisPk();
     } catch (e) { $("#pkSenarai").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
   });
+  function lukisPk() {
+    if (!pkData) return;
+    const w = +String($("#pkWaktu").value).replace(/\D/g, "");
+    const aktiviti = id => pkData.memo.find(x => x.murid_id === id && x.memo.jenis === "DALAM" &&
+      (x.memo.waktu_mula == null || (w >= x.memo.waktu_mula && w <= x.memo.waktu_akhir)));
+    $("#pkSenarai").innerHTML = `<p class="nota" style="margin:0 0 6px">Tanda murid yang <b>tiada</b> dalam kelas:</p><div class="pilihan">` + pkData.m.map(x => {
+      const ak = aktiviti(x.id);
+      if (pkData.tiada.has(x.id)) return `<label class="item" style="opacity:.55"><input type="checkbox" disabled><span>${P.esc(x.nama)}<small>Tidak hadir ke sekolah hari ini</small></span></label>`;
+      if (ak) return `<label class="item" style="opacity:.75"><input type="checkbox" disabled><span>${P.esc(x.nama)}<small style="color:var(--oren)">🏃 ${P.esc(huruf(ak.memo.nama))} · ${P.esc(teksWaktu(ak.memo))} · ${P.esc(P.namaPendek(ak.memo.guru_nama || ""))}</small></span></label>`;
+      return `<label class="item"><input type="checkbox" class="pk-m" value="${P.esc(x.id)}"><span>${P.esc(x.nama)}</span></label>`;
+    }).join("") + `</div>`;
+  }
+  $("#pkWaktu").addEventListener("change", lukisPk);
   $("#bLaporPk").addEventListener("click", async () => {
     const ids = [...document.querySelectorAll(".pk-m:checked")].map(c => c.value), subjek = $("#pkSubjek").value.trim();
     if (!subjek) return P.toast("Isi subjek", "ralat");

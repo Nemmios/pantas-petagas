@@ -104,6 +104,12 @@
         <div class="jadual-bungkus"><table class="kad-mobile"><thead><tr><th>Tarikh</th><th>Waktu</th><th>Subjek</th><th>Status</th><th>Dilapor oleh</th></tr></thead><tbody id="pPonteng"></tbody></table></div>
       </div>
 
+      <div class="kad">
+        <h2>Aktiviti / memo</h2>
+        <p class="nota">Aktiviti rasmi yang melibatkan murid ini (dicipta oleh guru penganjur).</p>
+        <div id="pAktiviti"></div>
+      </div>
+
       <div class="kad" id="kSurat">
         <h2>Surat amaran</h2>
         <div class="jadual-bungkus"><table class="kad-mobile"><thead><tr><th>Tarikh surat</th><th>Surat</th><th>Ruj.</th><th>Hari tidak hadir</th></tr></thead><tbody id="pSurat"></tbody></table></div>
@@ -231,7 +237,7 @@
       muridKini = m;
       document.title = `${P.namaPendek(m.nama)} · Profil Murid`;
 
-      const [hadir, sebab, ponteng, susulan, selesai, surat, penjaga] = await Promise.all([
+      const [hadir, sebab, ponteng, susulan, selesai, surat, penjaga, aktiviti] = await Promise.all([
         P.db.pilih("kehadiran", `select=tarikh,status,masa_tiba,idme_siap&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc`),
         P.db.pilih("sebab_tidak_hadir", `select=tarikh_mula,tarikh_akhir,catatan,sumber,minta_jumpa,status,dihantar_pada,kat:idme_kategori(nama),sbb:idme_sebab(nama)&murid_id=eq.${P.q(id)}&tarikh_akhir=gte.${dari}&tarikh_mula=lte.${hingga}&order=tarikh_mula.desc`),
         P.db.pilih("ponteng_kelas", `select=tarikh,waktu,subjek,status,catatan,pelapor:pengguna!ponteng_kelas_dilapor_oleh_fkey(nama)&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,waktu`),
@@ -239,6 +245,7 @@
         m.kelas_id ? P.db.pilih("kelas_selesai", `select=tarikh&kelas_id=eq.${m.kelas_id}${julat("tarikh")}`) : [],
         pentadbir() ? P.db.pilih("surat_amaran", `select=jenis,peringkat,no_siri,tarikh_surat,tarikh_tidak_hadir&murid_id=eq.${P.q(id)}${julat("tarikh_surat")}&order=tarikh_surat.desc`) : [],
         P.db.pilih("murid_penjaga", `select=penjaga(id,nama,hubungan,telefon,ic_4akhir,manual_pada)&murid_id=eq.${P.q(id)}&aktif=is.true`),
+        P.db.pilih("memo_murid", `select=memo:memo_aktiviti!inner(nama,jenis,tarikh_mula,tarikh_akhir,waktu_mula,waktu_akhir,lokasi,guru_nama)&murid_id=eq.${P.q(id)}&memo.tarikh_akhir=gte.${dari}&memo.tarikh_mula=lte.${hingga}`).catch(() => []),
       ]);
 
       // padan sebab bagi setiap hari tidak hadir
@@ -352,6 +359,13 @@
       $("#pSurat").innerHTML = surat.length ? surat.map(s => `<tr><td data-label="Tarikh surat">${P.tarikhCantik(s.tarikh_surat)}</td>
         <td data-label="Surat"><b>${SURAT[s.peringkat]}</b> · ${huruf(s.jenis)}</td><td data-label="Ruj.">(${s.no_siri})</td>
         <td data-label="Hari tidak hadir">${(s.tarikh_tidak_hadir || []).length} hari</td></tr>`).join("") : kosong(4, "Tiada surat amaran.");
+
+      // aktiviti
+      const akt = aktiviti.map(x => x.memo).sort((a, b) => b.tarikh_mula.localeCompare(a.tarikh_mula));
+      $("#pAktiviti").innerHTML = akt.length ? akt.map(a => `<div class="murid"><span class="nama"><b>${a.jenis === "LUAR" ? "🚌" : "🏃"} ${P.esc(huruf(a.nama))}</b>
+        <small style="color:var(--teks-2)">${a.tarikh_mula === a.tarikh_akhir ? P.tarikhCantik(a.tarikh_mula) : P.tarikhCantik(a.tarikh_mula) + " – " + P.tarikhCantik(a.tarikh_akhir)}
+        · ${a.jenis === "LUAR" ? "Luar sekolah" : a.waktu_mula == null ? "Sepanjang hari" : "Waktu " + a.waktu_mula + (a.waktu_akhir !== a.waktu_mula ? "–" + a.waktu_akhir : "")}${a.lokasi ? " · " + P.esc(a.lokasi) : ""}
+        · ${P.esc(P.namaPendek(a.guru_nama || ""))}</small></span></div>`).join("") : `<div class="muat">Tiada aktiviti direkodkan.</div>`;
 
       // susulan
       $("#pSusulan").innerHTML = susulan.length ? susulan.map(s => `<div class="murid"><span class="nama"><b>${SUSULAN[s.jenis] || P.esc(s.jenis)}</b>

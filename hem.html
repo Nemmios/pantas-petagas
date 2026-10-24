@@ -60,6 +60,11 @@
         <p class="nota">Hijau: kehadiran sudah dihantar. Merah: belum dihantar (dengan guru waktu pertama ikut jadual).</p>
         <div class="grid-kelas" id="gridKelas"></div>
       </div>
+      <div class="kad">
+        <h2>Aktiviti / memo pada tarikh ini</h2>
+        <p class="nota">Murid yang keluar kelas atau mewakili sekolah, dicipta oleh guru penganjur dalam PANTAS Guru.</p>
+        <div id="harianAktiviti"></div>
+      </div>
     </div>
 
     <!-- SENARAI IDME -->
@@ -379,8 +384,13 @@
   async function muatHarian() {
     $("#statistik").innerHTML = `<div class="muat">Memuatkan…</div>`;
     try {
-      const [rekod, selesai, pertama] = await Promise.all([ambilTakHadir(), P.db.pilih("kelas_selesai", `select=kelas_id,pada&tarikh=eq.${$("#tarikh").value}`),
-        guruWaktuPertama($("#tarikh").value)]);
+      const t = $("#tarikh").value;
+      const [rekod, selesai, pertama, memo] = await Promise.all([ambilTakHadir(), P.db.pilih("kelas_selesai", `select=kelas_id,pada&tarikh=eq.${t}`),
+        guruWaktuPertama(t),
+        P.db.pilih("memo_aktiviti", `select=nama,jenis,waktu_mula,waktu_akhir,lokasi,guru_nama,memo_murid(count)&tarikh_mula=lte.${t}&tarikh_akhir=gte.${t}&order=jenis,waktu_mula.nullsfirst`).catch(() => [])]);
+      $("#harianAktiviti").innerHTML = memo.length ? memo.map(a => `<div class="murid"><span class="nama"><b>${a.jenis === "LUAR" ? "🚌" : "🏃"} ${P.esc(huruf(a.nama))}</b>
+        <small style="color:var(--teks-2)">${a.jenis === "LUAR" ? "Luar sekolah" : a.waktu_mula == null ? "Sepanjang hari" : "Waktu " + a.waktu_mula + (a.waktu_akhir !== a.waktu_mula ? "–" + a.waktu_akhir : "")}${a.lokasi ? " · " + P.esc(a.lokasi) : ""} · ${P.esc(P.namaPendek(a.guru_nama || ""))}</small></span>
+        <span class="cip">${(a.memo_murid && a.memo_murid[0] && a.memo_murid[0].count) || 0} murid</span></div>`).join("") : `<div class="muat">Tiada aktiviti.</div>`;
       const th = rekod.filter(r => r.status === "TIDAK_HADIR");
       const kira = k => th.filter(r => r.keadaan === k).length;
       const sesi = $("#sesi").value, kls = kelas.filter(k => !sesi || k.sesi === sesi);
@@ -514,7 +524,8 @@
   // ---------- tetapan ----------
   // ---------- sandaran ----------
   const JADUAL_SANDARAN = ["kelas", "murid", "penjaga", "murid_penjaga", "pengguna", "takwim_cuti", "jadual_waktu",
-    "kehadiran", "kelas_selesai", "sebab_tidak_hadir", "surat_amaran", "tindakan_susulan", "ponteng_kelas"];
+    "kehadiran", "kelas_selesai", "sebab_tidak_hadir", "surat_amaran", "tindakan_susulan", "ponteng_kelas",
+    "memo_aktiviti", "memo_murid", "log_kemaskini"];
   function paparSandaranAkhir() {
     const t = P.simpan.get("pantas.sandaranAkhir");
     const hari = t ? Math.round((Date.parse(P.hariIni()) - Date.parse(t)) / 864e5) : null;
