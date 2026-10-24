@@ -184,7 +184,7 @@
       <div class="statistik" id="lmStat"></div>
       <div class="kad">
         <h2 id="lmTajuk">Kehadiran ikut kelas</h2>
-        <p class="nota tiada-cetak" style="margin:0 0 6px">Tekan angka atau nama hari untuk melihat senarai murid.</p>
+        <p class="nota tiada-cetak" style="margin:0 0 6px">Tekan <b>nama kelas</b> untuk kehadiran setiap murid minggu ini, atau tekan angka / nama hari untuk senarai murid tidak hadir.</p>
         <div class="jadual-bungkus"><table class="lm" id="lmJadual"></table></div>
         <div id="lmButiran" style="margin-top:12px"></div>
         <div class="baris tiada-cetak" style="margin-top:12px">
@@ -683,7 +683,7 @@
     const kepala = `<thead><tr><th>Kelas</th>${L.hari.map((t, i) => `<th class="angka lm-klik" data-t="${t}">${HARI_LM[i].slice(0, 3)}<small>${+t.slice(8, 10)}</small></th>`).join("")}<th class="angka">%</th></tr></thead>`;
     const sel = (s, k, t) => s.jenis === "ada" ? `<td class="angka lm-klik ${s.th ? "lm-th" : ""}" data-t="${t}" data-k="${P.esc(k)}">${s.th}${s.lw ? `<small>${s.lw}L</small>` : ""}</td>`
       : s.jenis === "belum" ? `<td class="angka lm-belum">—</td>` : s.jenis === "cuti" ? `<td class="angka lm-cuti">Cuti</td>` : `<td class="angka lm-akan">·</td>`;
-    const badan = L.kelas.map(k => `<tr><td><b>${P.esc(k.kelas)}</b><small>${P.esc(P.namaPendek(k.guru_kelas || "—"))}</small></td>
+    const badan = L.kelas.map(k => `<tr><td class="lm-kelas" data-kid="${k.kelas_id}" style="cursor:pointer"><b style="text-decoration:underline dotted;text-underline-offset:3px">${P.esc(k.kelas)}</b><small>${P.esc(P.namaPendek(k.guru_kelas || "—"))}</small></td>
       ${k.sel.map((s, i) => sel(s, k.kelas, L.hari[i])).join("")}<td class="angka">${k.peratus == null ? "—" : `<b style="color:${warnaPeratus(k.peratus)}">${k.peratus.toFixed(1)}%</b>`}</td></tr>`).join("");
     const kaki = `<tfoot><tr><td><b>Sekolah</b><small>${L.kelas.reduce((a, k) => a + k.enrolmen, 0)} murid</small></td>${L.hariStat.map(h => h.cuti ? `<td class="angka lm-cuti">Cuti</td>`
       : h.akan || !h.enrol ? `<td class="angka lm-akan">·</td>` : `<td class="angka"><b style="color:${warnaPeratus((1 - h.th / h.enrol) * 100)}">${Math.floor((1 - h.th / h.enrol) * 100)}%</b></td>`).join("")}
@@ -692,7 +692,36 @@
   }
   // senarai murid (baca sahaja) bagi satu hari / satu kelas
   const KEADAAN_LM = { ADA_SEBAB: ["Ada sebab", "ok"], BELUM_ADA_SEBAB: ["Belum ada sebab", "th"], PERLU_GURU_KELAS: ["Perlu guru kelas", "info"], PERLU_SEMAKAN: ["Perlu semakan", "info"] };
+  // kehadiran setiap murid dalam satu kelas bagi minggu dipilih (baca sahaja)
+  async function butiranKelas(kid) {
+    const L = kiraLaporan(), k = L.kelas.find(x => x.kelas_id === kid); if (!k) return;
+    $("#lmButiran").innerHTML = `<div class="muat">Memuatkan…</div>`;
+    try {
+      const m = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
+      const rek = m.length ? await P.db.pilih("kehadiran", `select=murid_id,tarikh,status,masa_tiba&tarikh=gte.${L.hari[0]}&tarikh=lte.${L.hari[4]}&murid_id=${inList(m.map(x => x.id))}`) : [];
+      const peta = {}; rek.forEach(r => (peta[r.murid_id + r.tarikh] = r));
+      const sel = (mid, s, t) => {
+        if (s.jenis === "cuti") return `<td class="lm-cuti">C</td>`;
+        if (s.jenis !== "ada") return `<td class="lm-akan">${s.jenis === "belum" ? "—" : "·"}</td>`;
+        const r = peta[mid + t];
+        if (!r) return `<td style="color:var(--hijau)">✓</td>`;
+        return r.status === "LEWAT" ? `<td class="lm-lw" title="${r.masa_tiba ? r.masa_tiba.slice(0, 5) : ""}">L</td>` : `<td class="lm-th">TH</td>`;
+      };
+      const baris = m.map(x => {
+        const bilTh = L.hari.filter(t => (peta[x.id + t] || {}).status === "TIDAK_HADIR").length;
+        return `<tr><td>${P.pautMurid(x.id, x.nama)}</td>${k.sel.map((s, i) => sel(x.id, s, L.hari[i])).join("")}<td class="${bilTh ? "lm-th" : ""}">${bilTh || ""}</td></tr>`;
+      }).join("");
+      $("#lmButiran").innerHTML = `<div class="kad" style="margin:0;background:var(--latar)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <h2 style="margin:0;font-size:15px">${P.esc(k.kelas)} · ${P.tarikhCantik(L.hari[0])} – ${P.tarikhCantik(L.hari[4])}</h2><button class="btn garis kecil tiada-cetak" id="lmTutup" type="button">Tutup</button></div>
+        <p class="nota" style="margin:4px 0 8px">${m.length} murid · ✓ hadir · <b style="color:var(--merah)">TH</b> tidak hadir · <b style="color:var(--oren)">L</b> lewat · — belum ditanda · C cuti</p>
+        <div class="jadual-bungkus"><table class="lm lm-murid"><thead><tr><th>Murid</th>${L.hari.map((t, i) => `<th>${HARI_LM[i][0]}<small>${+t.slice(8, 10)}</small></th>`).join("")}<th>TH</th></tr></thead>
+        <tbody>${baris || `<tr><td colspan="7" class="muat">Tiada murid.</td></tr>`}</tbody></table></div></div>`;
+      $("#lmTutup").addEventListener("click", () => ($("#lmButiran").innerHTML = ""));
+      $("#lmButiran").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (err) { $("#lmButiran").innerHTML = `<div class="mesej ralat">${P.esc(err.message)}</div>`; }
+  }
   $("#pLaporan").addEventListener("click", async e => {
+    const kc = e.target.closest(".lm-kelas"); if (kc && !e.target.closest("a")) return butiranKelas(+kc.dataset.kid);
     const c = e.target.closest(".lm-klik"); if (!c) return;
     const t = c.dataset.t, k = c.dataset.k || "";
     $("#lmButiran").innerHTML = `<div class="muat">Memuatkan…</div>`;
