@@ -176,7 +176,9 @@
       <div class="statistik" id="lmStat"></div>
       <div class="kad">
         <h2 id="lmTajuk">Kehadiran ikut kelas</h2>
+        <p class="nota tiada-cetak" style="margin:0 0 6px">Tekan angka atau nama hari untuk melihat senarai murid.</p>
         <div class="jadual-bungkus"><table class="lm" id="lmJadual"></table></div>
+        <div id="lmButiran" style="margin-top:12px"></div>
         <div class="baris tiada-cetak" style="margin-top:12px">
           <button class="btn garis" id="lmSalin" type="button">Salin ringkasan</button>
           <button class="btn garis" id="lmCetak" type="button">Cetak / PDF</button>
@@ -604,7 +606,7 @@
   async function muatLaporan() {
     if (!$("#lmTarikh").value) $("#lmTarikh").value = P.hariIni();
     lmIsnin = isninDari($("#lmTarikh").value);
-    $("#lmJadual").innerHTML = `<tr><td class="muat">Memuatkan…</td></tr>`; $("#lmStat").innerHTML = "";
+    $("#lmJadual").innerHTML = `<tr><td class="muat">Memuatkan…</td></tr>`; $("#lmStat").innerHTML = ""; $("#lmButiran").innerHTML = "";
     try { lmData = await P.db.rpcSemua("laporan_mingguan", { p_tarikh: lmIsnin }); lukisLaporan(); }
     catch (e) { $("#lmJadual").innerHTML = `<tr><td><div class="mesej ralat">${P.esc(e.message)}</div></td></tr>`; }
   }
@@ -641,16 +643,40 @@
       <div class="stat merah"><b>${L.th}</b><span>Murid-hari tidak hadir</span></div>
       <div class="stat oren"><b>${L.lw}</b><span>Murid-hari lewat</span></div>
       <div class="stat"><b>${L.belum}</b><span>Kelas-hari belum ditanda</span></div>`;
-    const kepala = `<thead><tr><th>Kelas</th>${L.hari.map((t, i) => `<th class="angka">${HARI_LM[i].slice(0, 3)}<small>${+t.slice(8, 10)}</small></th>`).join("")}<th class="angka">%</th></tr></thead>`;
-    const sel = s => s.jenis === "ada" ? `<td class="angka ${s.th ? "lm-th" : ""}">${s.th}${s.lw ? `<small>${s.lw}L</small>` : ""}</td>`
+    const kepala = `<thead><tr><th>Kelas</th>${L.hari.map((t, i) => `<th class="angka lm-klik" data-t="${t}">${HARI_LM[i].slice(0, 3)}<small>${+t.slice(8, 10)}</small></th>`).join("")}<th class="angka">%</th></tr></thead>`;
+    const sel = (s, k, t) => s.jenis === "ada" ? `<td class="angka lm-klik ${s.th ? "lm-th" : ""}" data-t="${t}" data-k="${P.esc(k)}">${s.th}${s.lw ? `<small>${s.lw}L</small>` : ""}</td>`
       : s.jenis === "belum" ? `<td class="angka lm-belum">—</td>` : s.jenis === "cuti" ? `<td class="angka lm-cuti">Cuti</td>` : `<td class="angka lm-akan">·</td>`;
     const badan = L.kelas.map(k => `<tr><td><b>${P.esc(k.kelas)}</b><small>${P.esc(P.namaPendek(k.guru_kelas || "—"))}</small></td>
-      ${k.sel.map(sel).join("")}<td class="angka">${k.peratus == null ? "—" : `<b style="color:${warnaPeratus(k.peratus)}">${k.peratus.toFixed(1)}%</b>`}</td></tr>`).join("");
+      ${k.sel.map((s, i) => sel(s, k.kelas, L.hari[i])).join("")}<td class="angka">${k.peratus == null ? "—" : `<b style="color:${warnaPeratus(k.peratus)}">${k.peratus.toFixed(1)}%</b>`}</td></tr>`).join("");
     const kaki = `<tfoot><tr><td><b>Sekolah</b><small>${L.kelas.reduce((a, k) => a + k.enrolmen, 0)} murid</small></td>${L.hariStat.map(h => h.cuti ? `<td class="angka lm-cuti">Cuti</td>`
       : h.akan || !h.enrol ? `<td class="angka lm-akan">·</td>` : `<td class="angka"><b style="color:${warnaPeratus((1 - h.th / h.enrol) * 100)}">${Math.floor((1 - h.th / h.enrol) * 100)}%</b></td>`).join("")}
       <td class="angka">${L.peratus == null ? "—" : `<b>${L.peratus.toFixed(1)}%</b>`}</td></tr></tfoot>`;
     $("#lmJadual").innerHTML = kepala + `<tbody>${badan || `<tr><td colspan="7" class="muat">Tiada data.</td></tr>`}</tbody>` + kaki;
   }
+  // senarai murid (baca sahaja) bagi satu hari / satu kelas
+  const KEADAAN_LM = { ADA_SEBAB: ["Ada sebab", "ok"], BELUM_ADA_SEBAB: ["Belum ada sebab", "th"], PERLU_GURU_KELAS: ["Perlu guru kelas", "info"], PERLU_SEMAKAN: ["Perlu semakan", "info"] };
+  $("#lmJadual").addEventListener("click", async e => {
+    const c = e.target.closest(".lm-klik"); if (!c) return;
+    const t = c.dataset.t, k = c.dataset.k || "";
+    $("#lmButiran").innerHTML = `<div class="muat">Memuatkan…</div>`;
+    try {
+      const sesi = $("#lmSesi").value;
+      let q = `select=murid_id,murid,kelas,sesi,status,masa_tiba,kategori,sebab,keadaan&tarikh=eq.${t}&order=kelas,status,murid`;
+      if (k) q += `&kelas=eq.${P.q(k)}`; else if (sesi) q += `&sesi=eq.${sesi}`;
+      const r = await P.db.pilih("v_tak_hadir", q);
+      const tajuk = `${P.tarikhCantik(t, true)}${k ? " · " + P.esc(k) : sesi ? " · Sesi " + huruf(sesi) : ""}`;
+      const kumpul = {}; r.forEach(x => (kumpul[x.kelas] = kumpul[x.kelas] || []).push(x));
+      $("#lmButiran").innerHTML = `<div class="kad" style="margin:0;background:var(--latar)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <h2 style="margin:0;font-size:15px">${tajuk}</h2><button class="btn garis kecil tiada-cetak" id="lmTutup" type="button">Tutup</button></div>
+        <p class="nota" style="margin:4px 0 8px">${r.filter(x => x.status === "TIDAK_HADIR").length} tidak hadir · ${r.filter(x => x.status === "LEWAT").length} lewat</p>` +
+        (r.length ? Object.entries(kumpul).map(([kl, s]) => `${k ? "" : `<div style="font-weight:700;font-size:13.5px;margin:10px 0 2px">${P.esc(kl)}</div>`}` + s.map(x => `<div class="murid">
+          <span class="nama">${P.pautMurid(x.murid_id, x.murid)}<small style="color:var(--teks-2)">${x.status === "LEWAT" ? `Lewat${x.masa_tiba ? " " + x.masa_tiba.slice(0, 5) : ""}` : x.sebab ? P.esc(huruf(x.kategori || "")) + " · " + P.esc(huruf(x.sebab)) : "Tidak hadir"}</small></span>
+          ${x.status === "LEWAT" ? `<span class="cip lw">Lewat</span>` : KEADAAN_LM[x.keadaan] ? `<span class="cip ${KEADAAN_LM[x.keadaan][1]}">${KEADAAN_LM[x.keadaan][0]}</span>` : ""}</div>`).join("")).join("")
+          : `<div class="muat">Tiada murid tidak hadir atau lewat.</div>`) + `</div>`;
+      $("#lmTutup").addEventListener("click", () => ($("#lmButiran").innerHTML = ""));
+      $("#lmButiran").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) { $("#lmButiran").innerHTML = `<div class="mesej ralat">${P.esc(err.message)}</div>`; }
+  });
   $("#lmTarikh").addEventListener("change", muatLaporan);
   $("#lmSesi").addEventListener("change", () => lmData.length && lukisLaporan());
   $("#lmSebelum").addEventListener("click", () => { $("#lmTarikh").value = P.tambahHari(lmIsnin || P.hariIni(), -7); muatLaporan(); });
@@ -821,12 +847,16 @@
     try {
       const m = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
       const ids = m.map(x => x.id);
-      const [th, memo, sebab] = await Promise.all([
-        ids.length ? P.db.pilih("kehadiran", `select=murid_id&tarikh=eq.${P.hariIni()}&status=eq.TIDAK_HADIR&murid_id=${inList(ids)}`) : [],
+      const [rekod, memo, sebab, selesai, pkHari] = await Promise.all([
+        ids.length ? P.db.pilih("kehadiran", `select=murid_id,status,masa_tiba&tarikh=eq.${P.hariIni()}&murid_id=${inList(ids)}`) : [],
         ambilMemo(ids, P.hariIni()),
-        ids.length ? P.db.pilih("sebab_tidak_hadir", `select=murid_id,idme_sebab(nama)&murid_id=${inList(ids)}&tarikh_mula=lte.${P.hariIni()}&tarikh_akhir=gte.${P.hariIni()}&status=neq.DITOLAK`) : []]);
+        ids.length ? P.db.pilih("sebab_tidak_hadir", `select=murid_id,idme_sebab(nama)&murid_id=${inList(ids)}&tarikh_mula=lte.${P.hariIni()}&tarikh_akhir=gte.${P.hariIni()}&status=neq.DITOLAK`) : [],
+        P.db.pilih("kelas_selesai", `select=pada&tarikh=eq.${P.hariIni()}&kelas_id=eq.${kid}`),
+        ids.length ? P.db.pilih("ponteng_kelas", `select=murid_id,waktu&tarikh=eq.${P.hariIni()}&murid_id=${inList(ids)}`) : []]);
       const sebabTh = {}; sebab.forEach(s => { if (s.idme_sebab) sebabTh[s.murid_id] = huruf(s.idme_sebab.nama); });
-      pkData = { m, tiada: new Set(th.map(x => x.murid_id)), memo, sebabTh };
+      const lewat = {}; rekod.filter(r => r.status === "LEWAT").forEach(r => (lewat[r.murid_id] = r.masa_tiba ? r.masa_tiba.slice(0, 5) : ""));
+      const dilapor = {}; pkHari.forEach(r => (dilapor[r.murid_id] = (dilapor[r.murid_id] || []).concat(r.waktu)));
+      pkData = { m, tiada: new Set(rekod.filter(r => r.status === "TIDAK_HADIR").map(x => x.murid_id)), memo, sebabTh, lewat, dilapor, ditanda: selesai.length > 0 };
       lukisPk();
     } catch (e) { $("#pkSenarai").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
   });
@@ -835,13 +865,22 @@
     const w = +String($("#pkWaktu").value).replace(/\D/g, "");
     const aktiviti = id => pkData.memo.find(x => x.murid_id === id && x.memo.jenis === "DALAM" &&
       (x.memo.waktu_mula == null || (w >= x.memo.waktu_mula && w <= x.memo.waktu_akhir)));
-    $("#pkSenarai").innerHTML = `<p class="nota" style="margin:0 0 6px">Tanda murid yang <b>tiada</b> dalam kelas:</p><div class="pilihan">` + pkData.m.map(x => {
+    const w0 = $("#pkWaktu").value;
+    $("#pkSenarai").innerHTML = (pkData.ditanda
+      ? `<p class="nota" style="margin:0 0 6px">Murid bertanda <b>✓ Hadir</b> sudah ditanda hadir ke sekolah hari ini. Jika mereka tiada dalam kelas anda, tandakan untuk lapor <b>ponteng kelas</b>:</p>`
+      : `<div class="mesej amaran" style="margin:0 0 8px">Kehadiran kelas ini <b>belum ditanda</b> oleh guru waktu pertama, jadi sistem belum tahu siapa yang hadir ke sekolah. Semak dengan murid sebelum melapor.</div>`) +
+      `<div class="pilihan">` + pkData.m.map(x => {
       const ak = aktiviti(x.id);
       if (pkData.tiada.has(x.id)) return `<div class="item" style="display:flex;gap:10px;align-items:center;padding:12px 14px;border:1px solid var(--garis);border-radius:12px;background:var(--merah-lembut)">
         <span style="flex:1;min-width:0">${P.esc(x.nama)}<small style="display:block;color:var(--merah)">Tidak hadir ke sekolah hari ini${pkData.sebabTh[x.id] ? " · " + P.esc(pkData.sebabTh[x.id]) : " · belum ada sebab"}</small></span>
         <button type="button" class="btn garis kecil pk-hadir" data-id="${P.esc(x.id)}" title="Murid ini sebenarnya ada">Dia ada</button></div>`;
       if (ak) return `<label class="item" style="opacity:.75"><input type="checkbox" disabled><span>${P.esc(x.nama)}<small style="color:var(--oren)">🏃 ${P.esc(huruf(ak.memo.nama))} · ${P.esc(teksWaktu(ak.memo))} · ${P.esc(P.namaPendek(ak.memo.guru_nama || ""))}</small></span></label>`;
-      return `<label class="item"><input type="checkbox" class="pk-m" value="${P.esc(x.id)}"><span>${P.esc(x.nama)}</span></label>`;
+      const status = pkData.lewat[x.id] !== undefined ? `<small style="color:var(--oren)">✓ Hadir · lewat${pkData.lewat[x.id] ? " " + pkData.lewat[x.id] : ""}</small>`
+        : pkData.ditanda ? `<small style="color:var(--hijau)">✓ Hadir</small>` : "";
+      const lain = (pkData.dilapor[x.id] || []).filter(v => v !== w0);
+      const sudah = (pkData.dilapor[x.id] || []).includes(w0);
+      return `<label class="item"><input type="checkbox" class="pk-m" value="${P.esc(x.id)}" ${sudah ? "checked disabled" : ""}><span>${P.esc(x.nama)}${status}
+        ${sudah ? `<small style="color:var(--merah)">Sudah dilapor untuk ${P.esc(w0)}</small>` : ""}${lain.length ? `<small style="color:var(--merah)">⚠ Dilapor tiada: ${P.esc(lain.join(", "))}</small>` : ""}</span></label>`;
     }).join("") + `</div>`;
   }
   $("#pkWaktu").addEventListener("change", lukisPk);
@@ -858,7 +897,7 @@
     } catch (err) { P.toast(err.message, "ralat"); b.disabled = false; }
   });
   $("#bLaporPk").addEventListener("click", async () => {
-    const ids = [...document.querySelectorAll(".pk-m:checked")].map(c => c.value), subjek = $("#pkSubjek").value.trim();
+    const ids = [...document.querySelectorAll(".pk-m:checked:not(:disabled)")].map(c => c.value), subjek = $("#pkSubjek").value.trim();
     if (!subjek) return P.toast("Isi subjek", "ralat");
     if (!ids.length) return P.toast("Tanda sekurang-kurangnya seorang murid", "ralat");
     $("#bLaporPk").disabled = true;
@@ -867,7 +906,7 @@
         catatan: $("#pkCatatan").value.trim() || null, dilapor_oleh: saya.id })), "tarikh,waktu,murid_id", true);
       P.simpan.set("pantas.subjek", subjek);
       P.toast(`${ids.length} murid dilapor kepada HEM`);
-      document.querySelectorAll(".pk-m:checked").forEach(c => (c.checked = false)); $("#pkCatatan").value = "";
+      $("#pkCatatan").value = ""; $("#pkKelas").dispatchEvent(new Event("change"));
       muatPkSaya();
     } catch (e) { P.toast(e.message, "ralat"); }
     finally { $("#bLaporPk").disabled = false; }

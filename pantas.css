@@ -196,6 +196,7 @@ table.lm td small, table.lm th small { display: block; font-size: 11px; color: v
 table.lm td:first-child small { overflow: hidden; text-overflow: ellipsis; }
 table.lm tfoot td { border-top: 2px solid var(--garis); }
 .lm-th { color: var(--merah); font-weight: 700; }
+.lm-klik { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
 .lm-belum, .lm-akan { color: var(--teks-2); }
 .lm-cuti { color: var(--teks-2); font-style: italic; }
 /* dialog */
