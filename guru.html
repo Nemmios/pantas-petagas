@@ -554,7 +554,7 @@
   });
   function lukisDipilih() {
     $("#akDipilih").innerHTML = akPilih.size ? `<small class="nota">${akPilih.size} murid dipilih (tekan untuk buang):</small><div class="ringkasan" style="margin-top:4px">` +
-      [...akPilih].map(([id, x]) => `<button type="button" class="cip ak-buang" data-id="${P.esc(id)}" style="cursor:pointer">${P.esc(P.namaPendek(x.nama))} · ${P.esc(x.kelas)} ✕</button>`).join("") + `</div>` : "";
+      [...akPilih].map(([id, x]) => `<button type="button" class="cip ak-buang" data-id="${P.esc(id)}" style="cursor:pointer;color:var(--teks);font-family:inherit">${P.esc(P.namaPendek(x.nama))} · ${P.esc(x.kelas)} ✕</button>`).join("") + `</div>` : "";
   }
   $("#akDipilih").addEventListener("click", e => {
     const b = e.target.closest(".ak-buang"); if (!b) return;
