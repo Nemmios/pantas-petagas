@@ -77,6 +77,7 @@
         </div>
         <p class="nota" style="margin-top:6px">Semua murid dianggap <b>hadir</b>. Tekan <b>TH</b> untuk tidak hadir atau <b>LW</b> untuk lewat.</p>
         <div class="ringkasan" id="ringkasan"></div>
+        <div id="mBertindih"></div>
         <div id="senarai"></div>
         <div class="bar-bawah"><button class="btn utama penuh" id="bSimpan" style="margin-top:0">Simpan kehadiran</button></div>
       </div>
@@ -304,7 +305,7 @@
   // ---------- tanda kehadiran ----------
   async function muatSenarai() {
     const kid = +$("#kelas").value, tarikh = $("#tarikh").value;
-    $("#kSelepas").classList.add("tersembunyi");
+    $("#kSelepas").classList.add("tersembunyi"); $("#mBertindih").innerHTML = "";
     if (!kid) { $("#kSenarai").classList.add("tersembunyi"); return; }
     const k = semuaKelas.find(x => x.id === kid);
     $("#kSenarai").classList.remove("tersembunyi");
@@ -365,6 +366,19 @@
     const buang = murid.filter(m => asal[m.id] && !tanda[m.id]).map(m => m.id);
     $("#bSimpan").disabled = true;
     try {
+      // elak bertindih: semak jika guru lain menyimpan kelas ini selepas senarai dibuka
+      const kini = murid.length ? await P.db.pilih("kehadiran", `select=murid_id,status&tarikh=eq.${tarikh}&murid_id=${inList(murid.map(m => m.id))}`) : [];
+      const server = {}; kini.forEach(h => (server[h.murid_id] = h.status));
+      if (murid.some(m => (server[m.id] || null) !== (asal[m.id] || null))) {
+        const gabung = { ...server };        // tanda guru lain + perubahan saya
+        murid.forEach(m => { if ((tanda[m.id] || null) !== (asal[m.id] || null)) { if (tanda[m.id]) gabung[m.id] = tanda[m.id]; else delete gabung[m.id]; } });
+        asal = server; tanda = gabung; lukisSenarai();
+        $("#mBertindih").innerHTML = `<div class="mesej amaran">⚠️ Guru lain baru sahaja menyimpan kehadiran kelas ini. Senarai sudah digabungkan (tanda mereka + tanda anda). Semak semula, kemudian tekan <b>Simpan</b> sekali lagi.</div>`;
+        $("#mBertindih").scrollIntoView({ behavior: "smooth", block: "center" });
+        $("#status").className = "cip ok"; $("#status").textContent = "Sudah dihantar oleh guru lain";
+        return;
+      }
+      $("#mBertindih").innerHTML = "";
       if (ubah.length) await P.db.upsert("kehadiran", ubah, "tarikh,murid_id");
       if (buang.length) await P.db.padam("kehadiran", `tarikh=eq.${tarikh}&murid_id=${inList(buang)}`);
       await P.db.upsert("kelas_selesai", [{ tarikh, kelas_id: kid, oleh: saya.id }], "tarikh,kelas_id", true);
