@@ -42,6 +42,7 @@
       <button class="aktif" data-v="tanda">Tanda kehadiran</button>
       <button data-v="ponteng">Ponteng kelas</button>
       <button data-v="kelasku" id="tKelasku" class="tersembunyi">Kelas saya</button>
+      <button data-v="profil" id="tProfil" class="tersembunyi">Profil murid</button>
     </div>
 
     <!-- JADUAL SAYA HARI INI -->
@@ -197,6 +198,7 @@
     const kAwal = kKini || kSaya;
     $("#sesi").value = kAwal ? kAwal.sesi : P.sesiSekarang();
     isiKelas(kAwal ? kAwal.id : "");
+    if (["GURU_KELAS", "HEM", "ADMIN", "PETUGAS"].includes(saya.peranan)) $("#tProfil").classList.remove("tersembunyi");
     if (saya.kelas_id) { $("#tKelasku").classList.remove("tersembunyi"); $("#tajukKelasku").textContent = `Kelas saya: ${kSaya ? kSaya.nama : ""}`; }
     if (kAwal) muatSenarai();
   }
@@ -390,6 +392,7 @@
 
   // ---------- kelas saya ----------
   document.querySelectorAll("#tabUtama button").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.v === "profil") { location.href = "murid.html"; return; }
     document.querySelectorAll("#tabUtama button").forEach(x => x.classList.toggle("aktif", x === b));
     $("#pTanda").classList.toggle("tersembunyi", b.dataset.v !== "tanda");
     $("#pKelasku").classList.toggle("tersembunyi", b.dataset.v !== "kelasku");
