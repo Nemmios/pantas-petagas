@@ -102,7 +102,7 @@
         <p class="nota">Murid hadir ke sekolah tetapi tiada dalam kelas, dilapor oleh guru mata pelajaran. Kemas kini status selepas disiasat.</p>
         <div class="ringkasan" id="ringkasPonteng"></div>
         <div class="jadual-bungkus"><table class="kad-mobile">
-          <thead><tr><th>Waktu</th><th>Kelas</th><th>Murid</th><th>Subjek</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Waktu</th><th>Kelas</th><th>Murid</th><th>Subjek</th><th>Dilapor oleh</th><th>Status</th><th></th></tr></thead>
           <tbody id="jPonteng"></tbody></table></div>
       </div>
       <div class="kad">
@@ -223,10 +223,10 @@
   // ---------- ponteng kelas ----------
   const STATUS_PK = { DILAPOR: ["Dilapor", "lw"], DIJUMPAI: ["Dijumpai", "info"], PONTENG: ["Ponteng sah", "th"], ADA_SEBAB: ["Ada sebab", "ok"] };
   async function muatPonteng() {
-    $("#jPonteng").innerHTML = `<tr><td colspan="6" class="muat">Memuatkan…</td></tr>`;
+    $("#jPonteng").innerHTML = `<tr><td colspan="7" class="muat">Memuatkan…</td></tr>`;
     try {
       const [rekod, kerap] = await Promise.all([
-        P.db.pilih("ponteng_kelas", `select=id,waktu,subjek,status,catatan,murid(nama,kelas(nama,sesi))&tarikh=eq.${$("#tarikh").value}&order=waktu,id`),
+        P.db.pilih("ponteng_kelas", `select=id,waktu,subjek,status,catatan,pada,murid(nama,kelas(nama,sesi)),pelapor:pengguna!ponteng_kelas_dilapor_oleh_fkey(nama)&tarikh=eq.${$("#tarikh").value}&order=waktu,id`),
         P.db.pilih("v_kekerapan", `select=murid,kelas,sesi,ponteng_kelas,lewat&or=(ponteng_kelas.gt.0,lewat.gt.0)&order=ponteng_kelas.desc,lewat.desc&limit=50`),
       ]);
       const sesi = $("#sesi").value;
@@ -238,13 +238,14 @@
         <td data-label="Waktu">${P.esc(x.waktu)}</td><td data-label="Kelas">${P.esc(x.murid && x.murid.kelas && x.murid.kelas.nama)}</td>
         <td data-label="Murid"><b>${P.esc(x.murid && x.murid.nama)}</b>${x.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(x.catatan)}</small>` : ""}</td>
         <td data-label="Subjek">${P.esc(x.subjek)}</td>
+        <td data-label="Dilapor oleh">${P.esc(x.pelapor ? P.namaPendek(x.pelapor.nama) : "—")}<br><small style="color:var(--teks-2)">${x.pada ? new Date(x.pada).toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" }) : ""}</small></td>
         <td data-label="Status"><select class="pk-status">${Object.entries(STATUS_PK).map(([s, [l]]) => `<option value="${s}" ${s === x.status ? "selected" : ""}>${l}</option>`).join("")}</select></td>
         <td data-label=""><button class="btn utama kecil pk-simpan">Simpan</button></td></tr>`).join("")
-        : `<tr><td colspan="6" class="muat">Tiada laporan ponteng kelas pada tarikh ini.</td></tr>`;
+        : `<tr><td colspan="7" class="muat">Tiada laporan ponteng kelas pada tarikh ini.</td></tr>`;
       $("#jKekerapan").innerHTML = k.length ? k.map(x => `<tr><td data-label="Murid"><b>${P.esc(x.murid)}</b></td><td data-label="Kelas">${P.esc(x.kelas)}</td>
         <td class="angka" data-label="Ponteng kelas">${x.ponteng_kelas}</td><td class="angka" data-label="Lewat">${x.lewat}</td></tr>`).join("")
         : `<tr><td colspan="4" class="muat">Tiada rekod ponteng kelas atau lewat tahun ini.</td></tr>`;
-    } catch (e) { ralat("#jPonteng", e, 6); }
+    } catch (e) { ralat("#jPonteng", e, 7); }
   }
   $("#jPonteng").addEventListener("click", async e => {
     const b = e.target.closest(".pk-simpan"); if (!b) return;
