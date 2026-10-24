@@ -162,6 +162,7 @@
     document.querySelectorAll("#vMasuk .tab button").forEach(x => x.classList.toggle("aktif", x === b));
     $("#kNama").classList.toggle("tersembunyi", mod !== "daftar"); $("#nama").required = mod === "daftar";
     $("#bMasuk").textContent = mod === "daftar" ? "Daftar" : "Log masuk";
+    $("#bLupa").parentElement.classList.toggle("tersembunyi", mod === "daftar");
     $("#kata").autocomplete = mod === "daftar" ? "new-password" : "current-password"; mesej("#mMasuk");
   }));
 
