@@ -163,6 +163,14 @@
     <!-- LAPORAN MINGGUAN (semua guru) -->
     <div id="pLaporan" class="tersembunyi">
       <div class="kad tiada-cetak">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+          <h2 style="margin:0">Status kelas hari ini</h2><button class="btn garis kecil" id="lmMuatHari" type="button" aria-label="Muat semula">↻</button>
+        </div>
+        <p class="nota" style="margin:4px 0 8px">Hijau: kehadiran sudah diambil. Merah: belum (dengan guru waktu pertama ikut jadual). Tekan kelas hijau untuk senarai murid.</p>
+        <div class="ringkasan" id="lmRingkasHari"></div>
+        <div class="grid-kelas" id="lmGridHari"></div>
+      </div>
+      <div class="kad tiada-cetak">
         <h2>Laporan kehadiran mingguan</h2>
         <p class="nota">Isnin hingga Jumaat. Angka = bilangan murid tidak hadir · <b>L</b> = lewat · <b>—</b> = belum ditanda.</p>
         <div style="display:flex;gap:8px;align-items:end">
@@ -603,7 +611,34 @@
   const isninDari = t => { const w = (new Date(t + "T00:00:00Z").getUTCDay() + 6) % 7; return P.tambahHari(t, -w); };
   const warnaPeratus = p => (p >= 95 ? "var(--hijau)" : p >= 90 ? "var(--oren)" : "var(--merah)");
   const ddmm = t => `${+t.slice(8, 10)}/${+t.slice(5, 7)}`;
+  async function muatStatusHari() {
+    const kini = P.hariIni(), sesi = $("#lmSesi").value;
+    const d = new Date(kini + "T00:00:00Z").getUTCDay();
+    if (d === 0 || d === 6) { $("#lmGridHari").innerHTML = `<div class="muat" style="grid-column:1/-1">Hari ini bukan hari persekolahan.</div>`; $("#lmRingkasHari").innerHTML = ""; return; }
+    try {
+      const [selesai, th] = await Promise.all([
+        P.db.pilih("kelas_selesai", `select=kelas_id,pada&tarikh=eq.${kini}`),
+        P.db.pilih("v_tak_hadir", `select=kelas,status&tarikh=eq.${kini}`)]);
+      const siap = new Map(selesai.map(s => [s.kelas_id, s.pada]));
+      const pertama = {}; jadualHari.forEach(s => { if (!pertama[s.kelas]) pertama[s.kelas] = s; });
+      const kls = semuaKelas.filter(k => !sesi || k.sesi === sesi);
+      const n = kls.filter(k => siap.has(k.id)).length;
+      $("#lmRingkasHari").innerHTML = `<span class="cip ok">Sudah ${n}</span><span class="cip th">Belum ${kls.length - n}</span>`;
+      $("#lmGridHari").innerHTML = kls.map(k => {
+        if (siap.has(k.id)) {
+          const bil = th.filter(r => r.kelas === k.nama && r.status === "TIDAK_HADIR").length;
+          const jam = new Date(siap.get(k.id)).toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" });
+          return `<div class="siap lm-klik" data-t="${kini}" data-k="${P.esc(k.nama)}" style="text-decoration:none">${P.esc(k.nama)}<small>TH ${bil} · ${jam}</small></div>`;
+        }
+        const g = pertama[k.nama];
+        return `<div class="belum">${P.esc(k.nama)}<small>Belum diambil</small>${g ? `<small class="guru">W${g.waktu} · ${P.esc(g.guru || g.subjek)}</small>` : ""}</div>`;
+      }).join("");
+    } catch (e) { $("#lmGridHari").innerHTML = `<div class="mesej ralat" style="grid-column:1/-1">${P.esc(e.message)}</div>`; }
+  }
+  $("#lmMuatHari").addEventListener("click", muatStatusHari);
+
   async function muatLaporan() {
+    muatStatusHari();
     if (!$("#lmTarikh").value) $("#lmTarikh").value = P.hariIni();
     lmIsnin = isninDari($("#lmTarikh").value);
     $("#lmJadual").innerHTML = `<tr><td class="muat">Memuatkan…</td></tr>`; $("#lmStat").innerHTML = ""; $("#lmButiran").innerHTML = "";
@@ -655,7 +690,7 @@
   }
   // senarai murid (baca sahaja) bagi satu hari / satu kelas
   const KEADAAN_LM = { ADA_SEBAB: ["Ada sebab", "ok"], BELUM_ADA_SEBAB: ["Belum ada sebab", "th"], PERLU_GURU_KELAS: ["Perlu guru kelas", "info"], PERLU_SEMAKAN: ["Perlu semakan", "info"] };
-  $("#lmJadual").addEventListener("click", async e => {
+  $("#pLaporan").addEventListener("click", async e => {
     const c = e.target.closest(".lm-klik"); if (!c) return;
     const t = c.dataset.t, k = c.dataset.k || "";
     $("#lmButiran").innerHTML = `<div class="muat">Memuatkan…</div>`;
@@ -674,11 +709,11 @@
           ${x.status === "LEWAT" ? `<span class="cip lw">Lewat</span>` : KEADAAN_LM[x.keadaan] ? `<span class="cip ${KEADAAN_LM[x.keadaan][1]}">${KEADAAN_LM[x.keadaan][0]}</span>` : ""}</div>`).join("")).join("")
           : `<div class="muat">Tiada murid tidak hadir atau lewat.</div>`) + `</div>`;
       $("#lmTutup").addEventListener("click", () => ($("#lmButiran").innerHTML = ""));
-      $("#lmButiran").scrollIntoView({ behavior: "smooth", block: "nearest" });
+      $("#lmButiran").scrollIntoView({ behavior: "smooth", block: "center" });
     } catch (err) { $("#lmButiran").innerHTML = `<div class="mesej ralat">${P.esc(err.message)}</div>`; }
   });
   $("#lmTarikh").addEventListener("change", muatLaporan);
-  $("#lmSesi").addEventListener("change", () => lmData.length && lukisLaporan());
+  $("#lmSesi").addEventListener("change", () => { muatStatusHari(); if (lmData.length) lukisLaporan(); });
   $("#lmSebelum").addEventListener("click", () => { $("#lmTarikh").value = P.tambahHari(lmIsnin || P.hariIni(), -7); muatLaporan(); });
   $("#lmSelepas").addEventListener("click", () => { $("#lmTarikh").value = P.tambahHari(lmIsnin || P.hariIni(), 7); muatLaporan(); });
   $("#lmCetak").addEventListener("click", () => window.print());
