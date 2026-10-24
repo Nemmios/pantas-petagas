@@ -55,7 +55,7 @@
       <div class="statistik" id="statistik"></div>
       <div class="kad">
         <h2>Status kelas</h2>
-        <p class="nota">Hijau: kehadiran sudah dihantar. Merah: belum dihantar.</p>
+        <p class="nota">Hijau: kehadiran sudah dihantar. Merah: belum dihantar (dengan guru waktu pertama ikut jadual).</p>
         <div class="grid-kelas" id="gridKelas"></div>
       </div>
     </div>
@@ -345,10 +345,26 @@
   }
 
   // ---------- harian ----------
+  // guru waktu pertama setiap kelas (daripada jadual waktu) — untuk kelas yang belum ditanda
+  const cacheJadual = {};
+  async function guruWaktuPertama(tarikh) {
+    const d = new Date(tarikh + "T00:00:00Z").getUTCDay(), hari = d === 0 ? 7 : d;
+    if (hari > 5) return {};
+    if (!cacheJadual[hari]) {
+      try {
+        const r = await P.db.pilih("jadual_waktu", `select=kelas,waktu,mula,subjek,guru&hari=eq.${hari}&order=waktu`);
+        const m = {}; r.forEach(s => { if (!m[s.kelas]) m[s.kelas] = s; });
+        cacheJadual[hari] = m;
+      } catch { return {}; }
+    }
+    return cacheJadual[hari];
+  }
+
   async function muatHarian() {
     $("#statistik").innerHTML = `<div class="muat">Memuatkan…</div>`;
     try {
-      const [rekod, selesai] = await Promise.all([ambilTakHadir(), P.db.pilih("kelas_selesai", `select=kelas_id,pada&tarikh=eq.${$("#tarikh").value}`)]);
+      const [rekod, selesai, pertama] = await Promise.all([ambilTakHadir(), P.db.pilih("kelas_selesai", `select=kelas_id,pada&tarikh=eq.${$("#tarikh").value}`),
+        guruWaktuPertama($("#tarikh").value)]);
       const th = rekod.filter(r => r.status === "TIDAK_HADIR");
       const kira = k => th.filter(r => r.keadaan === k).length;
       const sesi = $("#sesi").value, kls = kelas.filter(k => !sesi || k.sesi === sesi);
@@ -362,7 +378,9 @@
         <div class="stat biru"><b>${kira("PERLU_GURU_KELAS") + kira("PERLU_SEMAKAN")}</b><span>Perlu guru kelas</span></div>`;
       $("#gridKelas").innerHTML = kls.map(k => {
         const n = th.filter(r => r.kelas === k.nama).length;
-        return `<div class="${siap.has(k.id) ? "siap" : "belum"}">${P.esc(k.nama)}<small>${siap.has(k.id) ? `TH: ${n}` : "Belum ditanda"}</small></div>`;
+        const g = pertama[k.nama];
+        const guru = !siap.has(k.id) && g ? `<small class="guru">W${g.waktu}${g.mula ? " " + g.mula.slice(0, 5) : ""} · ${P.esc(g.guru || g.subjek)}</small>` : "";
+        return `<div class="${siap.has(k.id) ? "siap" : "belum"}">${P.esc(k.nama)}<small>${siap.has(k.id) ? `TH: ${n}` : "Belum ditanda"}</small>${guru}</div>`;
       }).join("");
     } catch (e) { $("#statistik").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
   }

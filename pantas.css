@@ -117,6 +117,15 @@ td.angka, th.angka { text-align: right; font-variant-numeric: tabular-nums; }
 .grid-kelas div.siap { background: var(--hijau-lembut); color: var(--hijau); border-color: transparent; }
 .grid-kelas div.belum { background: var(--merah-lembut); color: var(--merah); border-color: transparent; }
 .grid-kelas small { display: block; font-weight: 500; font-size: 12px; }
+.grid-kelas small.guru { opacity: .85; overflow-wrap: anywhere; }
+/* jadual saya hari ini */
+.jadual-cip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 6px; -webkit-overflow-scrolling: touch; }
+.slot { flex: 0 0 auto; min-width: 118px; text-align: left; font: inherit; color: var(--teks); background: var(--latar);
+  border: 1px solid var(--garis); border-radius: 12px; padding: 8px 11px; cursor: pointer; }
+.slot b { display: block; font-size: 14.5px; margin: 1px 0; }
+.slot small { display: block; font-size: 12px; color: var(--teks-2); }
+.slot.kini { border-color: var(--emas); box-shadow: inset 0 0 0 1.5px var(--emas); background: var(--kad); }
+.slot.lepas { opacity: .55; }
 
 .alat { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
 .alat > div { min-width: 140px; flex: 1; }
