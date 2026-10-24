@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PANTAS Ibu Bapa</title>
+<meta name="theme-color" content="#1a2433">
+<link rel="icon" href="logo-petagas.png">
+<link rel="stylesheet" href="pantas.css">
+</head>
+<body>
+<header class="kepala">
+  <img src="logo-petagas.png" alt="">
+  <div class="tajuk"><b>PANTAS Ibu Bapa</b><small>Sebab tidak hadir · SMK Petagas</small></div>
+</header>
+
+<main>
+  <!-- LANGKAH 1: pengesahan -->
+  <section id="l1" class="kad">
+    <h2>Pengesahan ibu bapa / penjaga</h2>
+    <p class="nota">Masukkan No. Kad Pengenalan dan No. Telefon anda seperti yang didaftarkan di sekolah.</p>
+    <form id="fSah" autocomplete="on">
+      <label for="ic">No. Kad Pengenalan ibu bapa / penjaga</label>
+      <input id="ic" inputmode="numeric" autocomplete="off" placeholder="cth 800101125555" maxlength="14" required>
+      <label for="tel">No. Telefon bimbit</label>
+      <input id="tel" type="tel" inputmode="tel" autocomplete="tel" placeholder="cth 0123456789" maxlength="15" required>
+      <label class="semak"><input type="checkbox" id="ingat"> <span>Ingat di telefon ini<br><small style="color:var(--teks-2);font-weight:400">Jangan tanda jika telefon ini dikongsi dengan orang lain.</small></span></label>
+      <div id="m1"></div>
+      <button class="btn utama penuh" id="bSah">Seterusnya</button>
+    </form>
+  </section>
+
+  <!-- LANGKAH 2: borang sebab -->
+  <section id="l2" class="tersembunyi">
+    <div class="kad">
+      <h2>Pilih anak</h2>
+      <div id="anak" class="pilihan"></div>
+    </div>
+    <form id="fSebab" class="kad">
+      <h2>Tarikh & sebab tidak hadir</h2>
+      <div class="baris">
+        <div><label for="mula">Dari</label><input id="mula" type="date" required></div>
+        <div><label for="akhir">Hingga</label><input id="akhir" type="date" required></div>
+      </div>
+
+      <div id="kotakSebab">
+        <label for="kategori">Kategori</label>
+        <select id="kategori" required><option value="">— Pilih kategori —</option></select>
+        <label for="sebab">Sebab</label>
+        <select id="sebab" required disabled><option value="">— Pilih kategori dahulu —</option></select>
+      </div>
+
+      <label class="semak"><input type="checkbox" id="jumpa"> <span>Sebab lain / saya ingin berbincang secara peribadi dengan guru kelas</span></label>
+
+      <label for="catatan">Catatan (pilihan)</label>
+      <textarea id="catatan" maxlength="300" placeholder="cth Ada surat MC dari Klinik Kesihatan Putatan"></textarea>
+
+      <div id="m2"></div>
+      <button class="btn emas penuh" id="bHantar">Hantar</button>
+      <button type="button" class="btn garis penuh" id="bTukar" style="margin-top:8px">Tukar pengguna</button>
+    </form>
+  </section>
+
+  <!-- LANGKAH 3: berjaya -->
+  <section id="l3" class="kad tersembunyi">
+    <div class="mesej ok" style="margin-top:0"><b>Terima kasih.</b> Maklumat telah dihantar kepada pihak sekolah.</div>
+    <div id="ringkas"></div>
+    <button class="btn utama penuh" id="bLagi">Hantar untuk tarikh / anak lain</button>
+  </section>
+</main>
+<footer>BERIMAN · HOLISTIK · BERILMU</footer>
+
+<script src="pantas.js"></script>
+<script>
+(() => {
+  const P = PANTAS, $ = s => document.querySelector(s);
+  const KUNCI_INGAT = "pantas.penjaga";
+  let ic = "", tel = "", anak = [], kategori = [], sebab = [];
+
+  const tunjuk = id => ["l1", "l2", "l3"].forEach(x => $("#" + x).classList.toggle("tersembunyi", x !== id));
+  const mesej = (sel, jenis, teks) => { $(sel).innerHTML = teks ? `<div class="mesej ${jenis}">${P.esc(teks)}</div>` : ""; };
+
+  // tarikh lalai & had
+  const hari = P.hariIni();
+  for (const s of ["#mula", "#akhir"]) { $(s).value = hari; $(s).min = P.tambahHari(hari, -7); $(s).max = P.tambahHari(hari, 30); }
+  $("#mula").addEventListener("change", () => { if ($("#akhir").value < $("#mula").value) $("#akhir").value = $("#mula").value; });
+
+  // senarai sebab (umum)
+  async function muatSebab() {
+    [kategori, sebab] = await Promise.all([
+      P.db.pilih("idme_kategori", "select=id,nama&boleh_ibubapa=eq.true&order=turutan"),
+      P.db.pilih("idme_sebab", "select=id,kategori_id,nama&boleh_ibubapa=eq.true&order=turutan"),
+    ]);
+    $("#kategori").innerHTML = `<option value="">— Pilih kategori —</option>` +
+      kategori.map(k => `<option value="${k.id}">${P.esc(huruf(k.nama))}</option>`).join("");
+  }
+  const huruf = s => s.toLowerCase().replace(/(^|[\s(/])\S/g, c => c.toUpperCase()).replace(/\bHfmd\b/, "HFMD").replace(/\bMc\b/, "MC");
+
+  $("#kategori").addEventListener("change", () => {
+    const k = +$("#kategori").value, s = $("#sebab");
+    const list = sebab.filter(x => x.kategori_id === k);
+    s.disabled = !k;
+    s.innerHTML = k ? `<option value="">— Pilih sebab —</option>` + list.map(x => `<option value="${x.id}">${P.esc(huruf(x.nama))}</option>`).join("")
+                    : `<option value="">— Pilih kategori dahulu —</option>`;
+    if (list.length === 1) s.value = list[0].id;
+  });
+
+  $("#jumpa").addEventListener("change", () => {
+    const j = $("#jumpa").checked;
+    $("#kotakSebab").classList.toggle("tersembunyi", j);
+    $("#kategori").required = $("#sebab").required = !j;
+    $("#catatan").placeholder = j ? "Nyatakan secara ringkas (pilihan). Guru kelas akan menghubungi anda." : "cth Ada surat MC dari Klinik Kesihatan Putatan";
+  });
+
+  // LANGKAH 1
+  async function sahkan(i, t, senyap) {
+    $("#bSah").disabled = true; mesej("#m1");
+    try {
+      const r = await P.db.rpc("semak_penjaga", { p_ic: i, p_tel: t });
+      if (!r || !r.length) {
+        if (senyap) { P.simpan.del(KUNCI_INGAT); return; }
+        mesej("#m1", "ralat", "Maklumat tidak sepadan dengan rekod sekolah. Pastikan No. KP dan No. Telefon betul, atau hubungi guru kelas untuk kemas kini nombor telefon.");
+        return;
+      }
+      ic = i; tel = t; anak = r;
+      if ($("#ingat").checked || senyap) P.simpan.set(KUNCI_INGAT, { ic, tel });
+      $("#anak").innerHTML = anak.map((a, n) => `
+        <label class="item"><input type="radio" name="anak" value="${P.esc(a.murid_id)}" ${anak.length === 1 || n === 0 ? "checked" : ""}>
+          <span>${P.esc(a.nama)}<small>${P.esc(a.kelas)} · Sesi ${a.sesi === "PAGI" ? "pagi" : "petang"}</small></span></label>`).join("");
+      if (!kategori.length) await muatSebab();
+      tunjuk("l2"); window.scrollTo(0, 0);
+    } catch (e) {
+      if (!senyap) mesej("#m1", "ralat", e.message);
+    } finally { $("#bSah").disabled = false; }
+  }
+
+  $("#fSah").addEventListener("submit", e => {
+    e.preventDefault();
+    const i = $("#ic").value.replace(/\D/g, ""), t = $("#tel").value.replace(/\D/g, "");
+    if (i.length < 6) return mesej("#m1", "ralat", "Sila masukkan No. Kad Pengenalan yang sah.");
+    if (t.length < 9) return mesej("#m1", "ralat", "Sila masukkan No. Telefon yang sah.");
+    sahkan(i, t, false);
+  });
+
+  // LANGKAH 2
+  $("#fSebab").addEventListener("submit", async e => {
+    e.preventDefault(); mesej("#m2");
+    const pilih = document.querySelector("input[name=anak]:checked");
+    if (!pilih) return mesej("#m2", "ralat", "Sila pilih anak.");
+    const jumpa = $("#jumpa").checked;
+    const sebabId = jumpa ? null : +$("#sebab").value;
+    if (!jumpa && !sebabId) return mesej("#m2", "ralat", "Sila pilih kategori dan sebab.");
+    if ($("#akhir").value < $("#mula").value) return mesej("#m2", "ralat", "Tarikh 'Hingga' mesti sama atau selepas tarikh 'Dari'.");
+    $("#bHantar").disabled = true;
+    try {
+      const id = await P.db.rpc("hantar_sebab", {
+        p_ic: ic, p_tel: tel, p_murid_id: pilih.value, p_tarikh_mula: $("#mula").value, p_tarikh_akhir: $("#akhir").value,
+        p_sebab_id: sebabId, p_catatan: $("#catatan").value.trim() || null, p_minta_jumpa: jumpa,
+      });
+      if (!id) { mesej("#m2", "ralat", "Pengesahan gagal. Sila mulakan semula."); return; }
+      const a = anak.find(x => x.murid_id === pilih.value);
+      const s = sebab.find(x => x.id === sebabId);
+      const tempoh = $("#mula").value === $("#akhir").value ? P.tarikhCantik($("#mula").value, true)
+        : `${P.tarikhCantik($("#mula").value)} hingga ${P.tarikhCantik($("#akhir").value)}`;
+      $("#ringkas").innerHTML = `<table><tbody>
+        <tr><th>Murid</th><td>${P.esc(a.nama)}<br><small>${P.esc(a.kelas)}</small></td></tr>
+        <tr><th>Tarikh</th><td>${P.esc(tempoh)}</td></tr>
+        <tr><th>Sebab</th><td>${jumpa ? "Ingin berbincang dengan guru kelas" : P.esc(huruf(s.nama))}</td></tr>
+        <tr><th>No. rujukan</th><td>#${id}</td></tr></tbody></table>`;
+      tunjuk("l3"); window.scrollTo(0, 0);
+    } catch (e) { mesej("#m2", "ralat", e.message); }
+    finally { $("#bHantar").disabled = false; }
+  });
+
+  $("#bLagi").addEventListener("click", () => {
+    $("#fSebab").reset(); $("#jumpa").dispatchEvent(new Event("change"));
+    $("#mula").value = $("#akhir").value = hari; $("#sebab").disabled = true;
+    const r = document.querySelector("input[name=anak]"); if (r) r.checked = true;
+    tunjuk("l2");
+  });
+  $("#bTukar").addEventListener("click", () => {
+    P.simpan.del(KUNCI_INGAT); ic = tel = ""; $("#ic").value = $("#tel").value = ""; $("#ingat").checked = false; tunjuk("l1");
+  });
+
+  // auto masuk jika diingati
+  const ingat = P.simpan.get(KUNCI_INGAT);
+  if (ingat && ingat.ic && ingat.tel) { $("#ic").value = ingat.ic; $("#tel").value = ingat.tel; $("#ingat").checked = true; sahkan(ingat.ic, ingat.tel, true); }
+})();
+</script>
+</body>
+</html>
