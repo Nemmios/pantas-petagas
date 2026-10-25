@@ -52,7 +52,7 @@
     <div id="kJadual" class="kad tersembunyi">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
         <h2 style="margin:0">Jadual saya hari ini</h2>
-        <button class="btn garis kecil" id="bTukarNama" type="button">Tukar nama</button>
+        <button class="btn garis kecil tersembunyi" id="bTukarNama" type="button">Tukar nama</button>
       </div>
       <p class="nota" id="jadualNota" style="margin:6px 0 10px"></p>
       <div id="jadualCip" class="jadual-cip"></div>
@@ -304,7 +304,7 @@
   const jam = t => (t ? t.slice(0, 5) : "");
   const guruSlot = s => String(s.guru_penuh || "").split(" / ").map(x => x.trim()).filter(Boolean);
   const kelasIkutNama = n => semuaKelas.find(k => k.nama === n);
-  let jadualHari = [], namaJadual = "", subjekAuto = true;
+  let jadualHari = [], namaJadual = "", subjekAuto = true, adminJadual = false;
 
   // padankan nama pengguna dengan nama penuh dalam jadual (tanpa BIN/BINTI, MOHD, NUR dsb.)
   function cariNama(nama, calon) {
@@ -324,8 +324,11 @@
     catch { jadualHari = []; }
     if (!jadualHari.length) return;          // jadual belum dimuat naik — aplikasi berfungsi seperti biasa
     const semuaGuru = [...new Set(jadualHari.flatMap(guruSlot))].sort();
-    const disimpan = P.simpan.get("pantas.namaJadual");
-    namaJadual = disimpan || cariNama(saya.nama, semuaGuru);
+    // nama jadual ditetapkan oleh ADMIN (pengguna.nama_jadual); jika belum, cuba padan automatik
+    P.simpan.del("pantas.namaJadual");       // buang pilihan lama yang disimpan di telefon
+    adminJadual = saya.peranan === "ADMIN";
+    namaJadual = saya.nama_jadual || cariNama(saya.nama, semuaGuru);
+    $("#bTukarNama").classList.toggle("tersembunyi", !adminJadual);
     $("#jadualNama").innerHTML = `<option value="">— Pilih nama —</option>` +
       semuaGuru.map(g => `<option ${g === namaJadual ? "selected" : ""}>${P.esc(g)}</option>`).join("");
     const subj = [...new Set([...SUBJEK, ...jadualHari.map(s => s.subjek)])].sort();
@@ -351,9 +354,11 @@
   }
   function paparJadual() {
     const blok = blokSaya(), t = minitKini(), kini = slotKini();
-    $("#jadualPilih").classList.toggle("tersembunyi", !!namaJadual);
+    $("#jadualPilih").classList.toggle("tersembunyi", !!namaJadual || !adminJadual);
     if (!namaJadual) {
-      $("#jadualNota").textContent = "Nama anda belum dipadankan dengan jadual waktu. Pilih nama anda di bawah (sekali sahaja).";
+      $("#jadualNota").textContent = adminJadual
+        ? "Nama anda belum dipadankan dengan jadual waktu. Pilih nama anda di bawah."
+        : "Nama anda belum dipadankan dengan jadual waktu. Minta admin tetapkan di halaman HEM → Tetapan → Pengguna sistem.";
       $("#jadualCip").innerHTML = ""; return;
     }
     $("#jadualNota").innerHTML = blok.length
@@ -375,11 +380,16 @@
     const elKini = $("#jadualCip .slot.kini"); if (elKini) elKini.scrollIntoView({ block: "nearest", inline: "center" });
   }
   $("#bTukarNama").addEventListener("click", () => $("#jadualPilih").classList.toggle("tersembunyi"));
-  $("#jadualNama").addEventListener("change", () => {
-    namaJadual = $("#jadualNama").value;
-    if (namaJadual) P.simpan.set("pantas.namaJadual", namaJadual); else P.simpan.del("pantas.namaJadual");
-    paparJadual();
-    if (namaJadual) P.toast("Nama jadual disimpan di telefon ini");
+  $("#jadualNama").addEventListener("change", async () => {
+    if (!adminJadual) return;
+    const nilai = $("#jadualNama").value;
+    try {
+      await P.db.kemaskini("pengguna", `id=eq.${saya.id}`, { nama_jadual: nilai || null });
+      saya.nama_jadual = nilai || null;
+      namaJadual = nilai;
+      paparJadual();
+      P.toast(nilai ? "Nama jadual disimpan" : "Nama jadual dikosongkan");
+    } catch (e) { P.toast(e.message, "ralat"); }
   });
 
   function isiKelas(pilih) {

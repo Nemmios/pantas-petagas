@@ -181,9 +181,13 @@
     <div id="pTetapan" class="tersembunyi">
       <div class="kad">
         <h2>Pengguna sistem</h2>
-        <p class="nota">Luluskan guru yang mendaftar, dan tetapkan peranan. Guru kelas perlu dipadankan dengan kelasnya. Hanya ADMIN boleh mengubah.</p>
+        <p class="nota">Luluskan guru yang mendaftar, dan tetapkan peranan. Guru kelas perlu dipadankan dengan kelasnya. <b>Nama jadual</b> menentukan kad "Jadual saya hari ini" guru. Hanya ADMIN boleh mengubah.</p>
+        <div id="kPadan" class="tersembunyi" style="margin:0 0 10px">
+          <button class="btn garis kecil" id="bPadanJadual" type="button">Padankan nama jadual secara automatik</button>
+          <div id="mPadan"></div>
+        </div>
         <div class="jadual-bungkus"><table class="kad-mobile">
-          <thead><tr><th>Nama</th><th>Peranan</th><th>Kelas (guru kelas)</th><th></th></tr></thead>
+          <thead><tr><th>Nama</th><th>Peranan</th><th>Kelas (guru kelas)</th><th>Nama jadual</th><th></th></tr></thead>
           <tbody id="jPengguna"></tbody></table></div>
         <p class="nota" style="margin:10px 0 0">🔑 <b>Set semula</b>: untuk guru yang lupa kata laluan. Sistem memberi kata laluan sementara; guru wajib menukarnya selepas log masuk.</p>
       </div>
@@ -648,33 +652,83 @@
     finally { $("#bSandaran").disabled = false; }
   });
 
+  let adaLajurJadual = true, penggunaTetapan = [], cacheNamaJadual = null;
   async function muatTetapan() {
-    $("#jPengguna").innerHTML = `<tr><td colspan="4" class="muat">Memuatkan…</td></tr>`;
+    $("#jPengguna").innerHTML = `<tr><td colspan="5" class="muat">Memuatkan…</td></tr>`;
     const admin = saya.peranan === "ADMIN";
     $("#kSandaran").classList.toggle("tersembunyi", !admin); if (admin) paparSandaranAkhir();
     try {
-      const [pengguna, cuti] = await Promise.all([
-        P.db.pilih("pengguna", "select=id,nama,peranan,kelas_id&order=peranan,nama"),
+      const [pengguna, cuti, namaGuru] = await Promise.all([
+        P.db.pilih("pengguna", "select=id,nama,peranan,kelas_id,nama_jadual&order=peranan,nama")
+          .catch(() => P.db.pilih("pengguna", "select=id,nama,peranan,kelas_id&order=peranan,nama").then(r => { adaLajurJadual = false; return r; })),
         P.db.pilih("takwim_cuti", `select=tarikh,keterangan&tarikh=gte.${P.hariIni().slice(0, 4)}-01-01&order=tarikh`),
+        senaraiNamaJadual(),
       ]);
+      $("#kPadan").classList.toggle("tersembunyi", !admin || !adaLajurJadual || !namaGuru.length);
+      penggunaTetapan = pengguna;
+      const pilihJadual = u => `<select class="u-jadual" ${admin && adaLajurJadual ? "" : "disabled"}><option value="">—</option>${namaGuru.map(g => `<option ${g === u.nama_jadual ? "selected" : ""}>${P.esc(g)}</option>`).join("")}${u.nama_jadual && !namaGuru.includes(u.nama_jadual) ? `<option selected>${P.esc(u.nama_jadual)}</option>` : ""}</select>`;
       const PER = ["MENUNGGU", "GURU", "GURU_KELAS", "PETUGAS", "HEM", "ADMIN"];
       $("#jPengguna").innerHTML = pengguna.map(u => `<tr data-id="${u.id}" data-nama="${P.esc(u.nama)}">
         <td data-label="Nama"><b>${P.esc(u.nama)}</b>${u.peranan === "MENUNGGU" ? ` <span class="cip th">Baharu</span>` : ""}${u.id === saya.id ? ` <span class="cip">Anda</span>` : ""}</td>
         <td data-label="Peranan"><select class="u-per" ${admin ? "" : "disabled"}>${PER.map(p => `<option ${p === u.peranan ? "selected" : ""}>${p}</option>`).join("")}</select></td>
         <td data-label="Kelas"><select class="u-kelas" ${admin ? "" : "disabled"}><option value="">—</option>${kelas.map(k => `<option value="${k.id}" ${k.id === u.kelas_id ? "selected" : ""}>${P.esc(k.nama)}${k.guru_kelas ? " · " + P.esc(P.namaPendek(k.guru_kelas)) : ""}</option>`).join("")}</select></td>
+        <td data-label="Nama jadual">${adaLajurJadual ? pilihJadual(u) : `<small style="color:var(--teks-2)">Jalankan SQL nama_jadual dahulu</small>`}</td>
         <td data-label="">${admin ? `<div style="width:100%"><span style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn utama kecil u-simpan">Simpan</button>${u.id !== saya.id ? `<button class="btn garis kecil u-set">🔑 Set semula</button>` : ""}</span><div class="u-hasil"></div></div>` : ""}</td></tr>`).join("");
       $("#jCuti").innerHTML = cuti.length ? cuti.map(c => `<tr><td>${P.tarikhCantik(c.tarikh, true)}</td><td>${P.esc(c.keterangan || "")}</td>
         <td style="text-align:right"><button class="btn garis kecil c-buang" data-t="${c.tarikh}">Buang</button></td></tr>`).join("")
         : `<tr><td class="muat">Belum ada hari cuti direkodkan untuk tahun ini.</td></tr>`;
-    } catch (e) { ralat("#jPengguna", e, 4); }
+    } catch (e) { ralat("#jPengguna", e, 5); }
   }
+
+  // ---------- nama jadual guru (padanan pengguna ↔ jadual_waktu.guru_penuh) ----------
+  async function senaraiNamaJadual() {
+    if (cacheNamaJadual) return cacheNamaJadual;
+    try {
+      const r = await P.db.pilih("jadual_waktu", "select=guru_penuh");
+      cacheNamaJadual = [...new Set(r.flatMap(s => String(s.guru_penuh || "").split(" / ").map(x => x.trim()).filter(Boolean)))].sort();
+    } catch { cacheNamaJadual = []; }
+    return cacheNamaJadual;
+  }
+  const BUANG_NAMA = new Set(["BIN", "BINTI", "BT", "BTE", "AL", "AP", "ANAK", "MOHD", "MOHAMAD", "MOHAMMAD", "MOHAMED", "MOHAMMED",
+    "MUHAMMAD", "MUHAMAD", "MUHD", "MD", "NUR", "NURUL", "NOR", "NOOR", "SITI", "ABD", "ABDUL", "HJ", "HAJI", "HAJAH", "HJH", "DR",
+    "CIKGU", "CG", "PUAN", "PN", "EN", "ENCIK", "TN", "CIK"]);
+  const tokNama = s => new Set(String(s || "").toUpperCase().replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(t => t.length >= 2 && !BUANG_NAMA.has(t)));
+  function cariNamaJadual(nama, calon) {
+    const a = tokNama(nama); if (!a.size) return "";
+    let terbaik = [], skor = 0;
+    for (const c of calon) {
+      const b = tokNama(c); let n = 0; a.forEach(t => { if (b.has(t)) n++; });
+      if (n > skor) { skor = n; terbaik = [c]; } else if (n && n === skor) terbaik.push(c);
+    }
+    return terbaik.length === 1 && skor >= Math.min(2, a.size, tokNama(terbaik[0]).size) ? terbaik[0] : "";
+  }
+  $("#bPadanJadual").addEventListener("click", async () => {
+    const btn = $("#bPadanJadual"); btn.disabled = true;
+    try {
+      const calon = await senaraiNamaJadual();
+      const sudah = new Set(penggunaTetapan.map(u => u.nama_jadual).filter(Boolean));
+      const kosong = penggunaTetapan.filter(u => !u.nama_jadual && u.peranan !== "MENUNGGU");
+      const dipadan = [], gagal = [];
+      for (const u of kosong) {
+        const n = cariNamaJadual(u.nama, calon.filter(c => !sudah.has(c)));
+        if (n) { dipadan.push([u, n]); sudah.add(n); } else gagal.push(u);
+      }
+      for (const [u, n] of dipadan) await P.db.kemaskini("pengguna", `id=eq.${u.id}`, { nama_jadual: n });
+      $("#mPadan").innerHTML = `<div class="mesej ok" style="margin:8px 0 0">${dipadan.length} guru dipadankan.` +
+        (gagal.length ? ` ${gagal.length} tidak dapat dipadankan secara automatik — pilih sendiri dalam lajur Nama jadual:<br><small>${gagal.map(u => P.esc(u.nama)).join(" · ")}</small>` : "") + `</div>`;
+      muatTetapan();
+    } catch (e) { P.toast(e.message, "ralat"); }
+    finally { btn.disabled = false; }
+  });
   $("#jPengguna").addEventListener("click", async e => {
     if (e.target.classList.contains("u-set")) return setSemula(e.target);
     if (e.target.classList.contains("u-salin")) return P.salin(e.target.dataset.teks).then(() => P.toast("Mesej disalin"));
     if (!e.target.classList.contains("u-simpan")) return;
     const tr = e.target.closest("tr"), per = tr.querySelector(".u-per").value, kid = tr.querySelector(".u-kelas").value;
     if (per === "GURU_KELAS" && !kid) return P.toast("Pilih kelas untuk guru kelas", "ralat");
-    try { await P.db.kemaskini("pengguna", `id=eq.${tr.dataset.id}`, { peranan: per, kelas_id: kid ? +kid : null }); P.toast("Disimpan"); muatTetapan(); }
+    const nilai = { peranan: per, kelas_id: kid ? +kid : null };
+    const sj = tr.querySelector(".u-jadual"); if (sj && adaLajurJadual) nilai.nama_jadual = sj.value || null;
+    try { await P.db.kemaskini("pengguna", `id=eq.${tr.dataset.id}`, nilai); P.toast("Disimpan"); muatTetapan(); }
     catch (err) { P.toast(err.message, "ralat"); }
   });
   async function setSemula(btn) {
