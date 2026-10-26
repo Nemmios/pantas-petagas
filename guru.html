@@ -917,11 +917,12 @@
       }
       ringkas.textContent = "✓ " + huruf(namaKat) + " › " + huruf(namaSebab);
       const bRekod = row.querySelector(".b-rekod");
-      if (bRekod) bRekod.textContent = "Ubah sebab";
+      if (bRekod) bRekod.textContent = "Tutup / buka borang";
       st.textContent = "Disimpan ✓"; st.style.color = "var(--hijau, #22c55e)";
       sel.disabled = kat.disabled = false;
       delete kotak.dataset.menyimpan;
-      setTimeout(() => { kotak.classList.add("tersembunyi"); st.textContent = "Pilih sebab lain untuk mengubah. Ia disimpan automatik."; st.style.color = "var(--teks-2)"; }, 900);
+      // Borang kekal terbuka supaya pilihan yang disimpan masih kelihatan
+      setTimeout(() => { st.textContent = "Disimpan ✓ — pilih sebab lain atau ubah catatan untuk mengemas kini."; }, 1500);
     } catch (err) {
       P.toast(err.message, "ralat");
       st.textContent = "Tidak disimpan — pilih sebab sekali lagi."; st.style.color = "var(--merah, #ef4444)";
@@ -940,6 +941,8 @@
   $("#senaraiKelasku").addEventListener("change", e => {
     const row = e.target.closest(".murid"); if (!row) return;
     if (e.target.classList.contains("r-sebab")) { simpanSebabAuto(row); return; }
+    // Catatan diubah selepas sebab disimpan: simpan semula (berlaku apabila selesai menaip)
+    if (e.target.classList.contains("r-cat")) { if (row.dataset.disimpan === "1") simpanSebabAuto(row); return; }
     if (!e.target.classList.contains("r-kat")) return;
     const k = +e.target.value, s = e.target.closest(".borang-rekod").querySelector(".r-sebab");
     const list = sebabSemua.filter(x => x.kategori_id === k);
