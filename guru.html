@@ -879,29 +879,59 @@
     if (e.target.classList.contains("b-rekod")) {
       kotak.classList.toggle("tersembunyi");
       if (!kotak.innerHTML) kotak.innerHTML = `
+        <label>Catatan (pilihan — isi dahulu jika perlu)</label><input class="r-cat" maxlength="300">
         <label>Kategori</label><select class="r-kat"><option value="">— Pilih —</option>${kategoriSemua.map(k => `<option value="${k.id}">${P.esc(k.nama)}</option>`).join("")}</select>
         <label>Sebab</label><select class="r-sebab" disabled><option value="">— Pilih kategori —</option></select>
-        <label>Catatan (pilihan)</label><input class="r-cat" maxlength="300">
-        <button class="btn utama kecil r-simpan" style="margin-top:10px">Simpan sebab</button>`;
+        <div class="r-status" style="margin-top:8px;font-size:.9em;color:var(--teks-2)">Sebab disimpan automatik sebaik dipilih.</div>`;
       return;
     }
-    if (e.target.classList.contains("r-simpan")) {
-      const sid = +row.querySelector(".r-sebab").value, kid = +row.querySelector(".r-kat").value;
-      if (!sid) return P.toast("Pilih kategori dan sebab", "ralat");
-      e.target.disabled = true;
-      try {
-        await P.db.tambah("sebab_tidak_hadir", [{ murid_id: row.dataset.id, tarikh_mula: row.dataset.tarikh, tarikh_akhir: row.dataset.tarikh,
-          kategori_id: kid, sebab_id: sid, catatan: row.querySelector(".r-cat").value.trim() || null, sumber: "GURU" }]);
-        P.toast("Sebab direkodkan"); muatKelasku();
-      } catch (err) { P.toast(err.message, "ralat"); e.target.disabled = false; }
-    }
   });
+
+  // Simpan sebab secara automatik sebaik sahaja sebab dipilih
+  async function simpanSebabAuto(row) {
+    const kotak = row.querySelector(".borang-rekod");
+    const sel = row.querySelector(".r-sebab"), kat = row.querySelector(".r-kat");
+    const sid = +sel.value, kid = +kat.value;
+    const st = row.querySelector(".r-status");
+    if (!sid || kotak.dataset.menyimpan === "1") return;
+    kotak.dataset.menyimpan = "1";
+    sel.disabled = kat.disabled = true;
+    st.textContent = "Menyimpan…"; st.style.color = "var(--teks-2)";
+    try {
+      await P.db.tambah("sebab_tidak_hadir", [{ murid_id: row.dataset.id, tarikh_mula: row.dataset.tarikh, tarikh_akhir: row.dataset.tarikh,
+        kategori_id: kid, sebab_id: sid, catatan: row.querySelector(".r-cat").value.trim() || null, sumber: "GURU" }]);
+      st.textContent = "Disimpan ✓"; st.style.color = "var(--hijau, #22c55e)";
+      kemaskiniRingkas();
+      setTimeout(() => {
+        row.style.transition = "opacity .3s"; row.style.opacity = "0";
+        setTimeout(() => {
+          row.remove();
+          if (!$("#senaraiKelasku").querySelector(".murid")) $("#senaraiKelasku").innerHTML = `<div class="mesej ok">Tiada murid yang perlu tindakan. 👍</div>`;
+        }, 300);
+      }, 700);
+    } catch (err) {
+      P.toast(err.message, "ralat");
+      st.textContent = "Tidak disimpan — pilih sebab sekali lagi."; st.style.color = "var(--merah, #ef4444)";
+      sel.disabled = kat.disabled = false; sel.value = "";
+      delete kotak.dataset.menyimpan;
+    }
+  }
+  // Tambah 1 pada "Ada sebab", tolak 1 daripada "Perlu tindakan"
+  function kemaskiniRingkas() {
+    const r = $("#ringkasKelasku"); if (!r) return;
+    const perlu = r.querySelector(".cip.th"), ada = r.querySelector(".cip.ok");
+    const n = (el) => +((el && el.textContent.match(/\d+/)) || [0])[0];
+    if (perlu) perlu.textContent = `Perlu tindakan ${Math.max(0, n(perlu) - 1)}`;
+    if (ada) ada.textContent = `Ada sebab ${n(ada) + 1}`;
+  }
   $("#senaraiKelasku").addEventListener("change", e => {
+    const row = e.target.closest(".murid"); if (!row) return;
+    if (e.target.classList.contains("r-sebab")) { simpanSebabAuto(row); return; }
     if (!e.target.classList.contains("r-kat")) return;
     const k = +e.target.value, s = e.target.closest(".borang-rekod").querySelector(".r-sebab");
     const list = sebabSemua.filter(x => x.kategori_id === k);
     s.disabled = !k; s.innerHTML = `<option value="">— Pilih sebab —</option>` + list.map(x => `<option value="${x.id}">${P.esc(x.nama)}</option>`).join("");
-    if (list.length === 1) s.value = list[0].id;
+    if (list.length === 1) { s.value = list[0].id; simpanSebabAuto(row); }
   });
 
   // ---------- lapor ponteng kelas ----------
