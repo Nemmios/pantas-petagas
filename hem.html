@@ -75,6 +75,7 @@
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn garis kecil" id="bPilihSemua">Pilih semua</button>
             <button class="btn garis kecil" id="bCsv">Eksport CSV</button>
+            <button class="btn emas kecil" id="bTampal" title="Tandakan murid satu kelas dahulu">📋 Salin untuk Tampal Pantas</button>
             <button class="btn utama kecil" id="bSiap">Tanda terpilih: siap idMe</button>
           </div>
         </div>
@@ -541,6 +542,19 @@
       P.toast(`${ids.length} rekod ditanda siap idMe`); muatIdme(); }
     catch (e) { P.toast(e.message, "ralat"); }
   });
+  $("#bTampal").addEventListener("click", async () => {
+    const ids = new Set([...document.querySelectorAll("#jIdme .pilih:checked")].map(c => String(c.value)));
+    let rekod = senaraiIdme.filter(r => ids.has(String(r.kehadiran_id)));
+    if (!rekod.length) {
+      const kls = [...new Set(senaraiIdme.filter(r => !r.idme_siap).map(r => r.kelas))];
+      if (kls.length !== 1) return P.toast("Tandakan murid daripada SATU kelas dahulu (idMe diisi ikut kelas)", "ralat");
+      rekod = senaraiIdme.filter(r => !r.idme_siap && r.kelas === kls[0]);
+    }
+    const kelasDipilih = [...new Set(rekod.map(r => r.kelas))];
+    if (kelasDipilih.length > 1) return P.toast(`Murid dipilih daripada ${kelasDipilih.length} kelas. Pilih satu kelas sahaja.`, "ralat");
+    try { await P.salin(P.barisTampal(rekod)); P.toast(`${rekod.length} murid ${kelasDipilih[0]} disalin. Tampal dalam Tampal Pantas di idMe.`); }
+    catch (e) { P.toast(e.message, "ralat"); }
+  });
   $("#bCsv").addEventListener("click", () => {
     if (!senaraiIdme.length) return P.toast("Tiada data untuk dieksport", "ralat");
     P.muatTurunCsv(`idme_${$("#tarikh").value}${$("#sesi").value ? "_" + $("#sesi").value : ""}.csv`,
@@ -713,6 +727,7 @@
         const n = cariNamaJadual(u.nama, calon.filter(c => !sudah.has(c)));
         if (n) { dipadan.push([u, n]); sudah.add(n); } else gagal.push(u);
       }
+      if (!kosong.length) { $("#mPadan").innerHTML = `<div class="mesej ok" style="margin:8px 0 0">Semua pengguna sudah ada nama jadual. Tiada yang perlu dipadankan.</div>`; return; }
       for (const [u, n] of dipadan) await P.db.kemaskini("pengguna", `id=eq.${u.id}`, { nama_jadual: n });
       $("#mPadan").innerHTML = `<div class="mesej ok" style="margin:8px 0 0">${dipadan.length} guru dipadankan.` +
         (gagal.length ? ` ${gagal.length} tidak dapat dipadankan secara automatik — pilih sendiri dalam lajur Nama jadual:<br><small>${gagal.map(u => P.esc(u.nama)).join(" · ")}</small>` : "") + `</div>`;

@@ -99,6 +99,15 @@
     <!-- KELAS SAYA (guru kelas) -->
     <div id="pKelasku" class="tersembunyi">
       <div class="kad">
+        <h2>📋 Salin untuk Tampal Pantas</h2>
+        <p class="nota">Salin senarai murid tidak hadir kelas anda, kemudian tampal dalam extension <b>Tampal Pantas</b> di halaman kehadiran idMe (kelas &amp; tarikh yang sama).</p>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+          <div style="flex:1;min-width:150px"><label for="tpTarikh" style="margin-top:0">Tarikh</label><input id="tpTarikh" type="date"></div>
+          <button class="btn emas" id="bSalinTampal" type="button">📋 Salin senarai</button>
+        </div>
+        <div id="tpRingkas" class="nota" style="margin-top:8px"></div>
+      </div>
+      <div class="kad">
         <h2 id="tajukKelasku">Kelas saya</h2>
         <p class="nota">Murid tidak hadir dalam 14 hari lepas yang perlu tindakan guru kelas. Tekan nama murid untuk lihat profil penuh.</p>
         <a class="btn garis kecil" href="murid.html" style="margin-bottom:10px">👤 Profil murid kelas saya</a>
@@ -771,8 +780,42 @@
     P.salin(teks).then(() => P.toast("Ringkasan disalin. Tampal di WhatsApp."));
   });
 
+  // ---------- salin untuk Tampal Pantas ----------
+  async function rekodTampal() {
+    const k = semuaKelas.find(x => x.id === saya.kelas_id); if (!k) return { k: null, r: [] };
+    const t = $("#tpTarikh").value || P.hariIni();
+    const r = await P.db.pilih("v_tak_hadir", `select=murid,kategori,sebab,keadaan&kelas=eq.${P.q(k.nama)}&tarikh=eq.${t}&status=eq.TIDAK_HADIR&order=murid`);
+    return { k, r, t };
+  }
+  let cacheTampal = null;   // { t, k, r } — disediakan awal supaya salinan berlaku serta-merta semasa butang ditekan
+  async function ringkasTampal() {
+    try {
+      const { k, r, t } = await rekodTampal(); if (!k) return;
+      cacheTampal = { k, r, t };
+      const tiada = r.filter(x => !x.kategori && !x.sebab).length;
+      $("#tpRingkas").innerHTML = r.length
+        ? `${k.nama} · ${P.tarikhCantik(t, true)}: <b>${r.length}</b> murid tidak hadir${tiada ? ` · <span style="color:var(--oren)">${tiada} belum ada sebab (nama sahaja)</span>` : ""}`
+        : `${k.nama} · ${P.tarikhCantik(t, true)}: tiada murid tidak hadir direkodkan.`;
+    } catch (e) { $("#tpRingkas").textContent = e.message; }
+  }
+  $("#tpTarikh").addEventListener("change", ringkasTampal);
+  $("#bSalinTampal").addEventListener("click", async () => {
+    const b = $("#bSalinTampal"); b.disabled = true;
+    try {
+      const t = $("#tpTarikh").value || P.hariIni();
+      const { k, r } = cacheTampal && cacheTampal.t === t ? cacheTampal : await rekodTampal();
+      if (!k) return P.toast("Akaun anda belum dipadankan dengan kelas", "ralat");
+      if (!r.length) return P.toast("Tiada murid tidak hadir pada tarikh ini", "ralat");
+      await P.salin(P.barisTampal(r));
+      P.toast(`${r.length} murid disalin. Tampal dalam Tampal Pantas di idMe.`);
+    } catch (e) { P.toast(e.message, "ralat"); }
+    finally { b.disabled = false; }
+  });
+
   async function muatKelasku() {
     const k = semuaKelas.find(x => x.id === saya.kelas_id); if (!k) return;
+    if (!$("#tpTarikh").value) { $("#tpTarikh").value = P.hariIni(); $("#tpTarikh").max = P.hariIni(); }
+    ringkasTampal();
     const dari = P.tambahHari(P.hariIni(), -14);
     try {
       if (!kategoriSemua.length) [kategoriSemua, sebabSemua] = await Promise.all([

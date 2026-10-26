@@ -212,6 +212,17 @@ const PANTAS = (() => {
   function namaPendek(n) {
     return String(n || "").replace(/\s+(BIN|BINTI|BT|B\.|A\/L|A\/P|ANAK)\s+.*$/i, "").trim() || n;
   }
+  // Baris untuk extension Tampal Pantas: "Nama - KATEGORI > SEBAB".
+  // Tanpa sebab: "Nama<TAB>-" — supaya Tampal Pantas tidak tersilap membaca perkataan
+  // dalam nama (cth ASMA, RASMI) sebagai sebab.
+  function barisTampal(rekod) {
+    return rekod.map(r => {
+      const nama = String(r.murid || r.nama || "").replace(/\s+/g, " ").trim();
+      if (!nama) return "";
+      const kat = String(r.kategori || "").trim(), sbb = String(r.sebab || "").trim();
+      return kat && sbb ? `${nama} - ${kat} > ${sbb}` : kat ? `${nama} - ${kat}` : sbb ? `${nama} - ${sbb}` : `${nama}\t-`;
+    }).filter(Boolean).join("\n");
+  }
   function toast(msg, jenis = "ok") {
     let t = document.getElementById("toast");
     if (!t) { t = el(`<div id="toast" role="status" aria-live="polite"></div>`); document.body.appendChild(t); }
@@ -245,5 +256,5 @@ const PANTAS = (() => {
   }
 
   return { URL_SB, KUNCI, db, auth, q, simpan, hariIni, tambahHari, tarikhCantik, sesiSekarang,
-           el, esc, namaPendek, toast, salin, telWa, muatTurunCsv, pautMurid, dialogTukarKata, dialogLupaKata };
+           el, esc, namaPendek, barisTampal, toast, salin, telWa, muatTurunCsv, pautMurid, dialogTukarKata, dialogLupaKata };
 })();
