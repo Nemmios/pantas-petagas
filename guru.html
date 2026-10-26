@@ -900,15 +900,28 @@
     try {
       await P.db.tambah("sebab_tidak_hadir", [{ murid_id: row.dataset.id, tarikh_mula: row.dataset.tarikh, tarikh_akhir: row.dataset.tarikh,
         kategori_id: kid, sebab_id: sid, catatan: row.querySelector(".r-cat").value.trim() || null, sumber: "GURU" }]);
+      // Kekal dalam senarai dengan label hijau; boleh diubah semula
+      const pertama = row.dataset.disimpan !== "1";
+      row.dataset.disimpan = "1";
+      if (pertama) kemaskiniRingkas();
+      const label = row.querySelector(":scope > .cip");
+      if (label) { label.className = "cip ok"; label.textContent = "Ada sebab ✓"; }
+      const namaKat = kat.options[kat.selectedIndex] ? kat.options[kat.selectedIndex].text : "";
+      const namaSebab = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+      let ringkas = row.querySelector(".r-ringkas");
+      if (!ringkas) {
+        ringkas = document.createElement("div");
+        ringkas.className = "r-ringkas";
+        ringkas.style.cssText = "width:100%;margin-top:4px;font-size:.9em;color:var(--hijau)";
+        row.querySelector(".nama").after(ringkas);
+      }
+      ringkas.textContent = "✓ " + huruf(namaKat) + " › " + huruf(namaSebab);
+      const bRekod = row.querySelector(".b-rekod");
+      if (bRekod) bRekod.textContent = "Ubah sebab";
       st.textContent = "Disimpan ✓"; st.style.color = "var(--hijau, #22c55e)";
-      kemaskiniRingkas();
-      setTimeout(() => {
-        row.style.transition = "opacity .3s"; row.style.opacity = "0";
-        setTimeout(() => {
-          row.remove();
-          if (!$("#senaraiKelasku").querySelector(".murid")) $("#senaraiKelasku").innerHTML = `<div class="mesej ok">Tiada murid yang perlu tindakan. 👍</div>`;
-        }, 300);
-      }, 700);
+      sel.disabled = kat.disabled = false;
+      delete kotak.dataset.menyimpan;
+      setTimeout(() => { kotak.classList.add("tersembunyi"); st.textContent = "Pilih sebab lain untuk mengubah. Ia disimpan automatik."; st.style.color = "var(--teks-2)"; }, 900);
     } catch (err) {
       P.toast(err.message, "ralat");
       st.textContent = "Tidak disimpan — pilih sebab sekali lagi."; st.style.color = "var(--merah, #ef4444)";
