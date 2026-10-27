@@ -609,10 +609,15 @@
     return slot.map(g => {
       const asal = String(g.guru_penuh || "").split(" / ").map(x => x.trim());
       const r = relief.find(x => x.kelas === g.kelas && x.waktu === g.waktu && asal.includes(x.guru_asal));
-      const nama = P.esc(g.guru || g.subjek), sub = slot.length > 1 ? ` (${P.esc(g.subjek)})` : "";
-      if (r && r.jenis === "RELIEF") return `🔁 ${P.esc(r.guru_ganti)}${sub || ""} relief`;
-      if (r) return `${nama}${sub} tidak hadir · ${r.jenis === "DIBATALKAN" ? "kelas dibatalkan" : "tiada guru ganti"}`;
-      return nama + sub;
+      const sub = slot.length > 1 ? ` (${P.esc(g.subjek)})` : "";
+      if (!r) return P.esc(g.guru || g.subjek) + sub;
+      // tunjuk setiap guru dalam baris (elektif: cth RC/SS dua guru) — yang tidak hadir diganti
+      return asal.map(n => {
+        const x = relief.find(y => y.kelas === g.kelas && y.waktu === g.waktu && y.guru_asal === n);
+        if (!x) return P.esc(P.namaPendek(n));
+        if (x.jenis === "RELIEF") return `🔁 ${P.esc(x.guru_ganti)} relief`;
+        return `${P.esc(P.namaPendek(n))} tidak hadir · ${x.jenis === "DIBATALKAN" ? "kelas dibatalkan" : "tiada guru ganti"}`;
+      }).join(" / ") + sub;
     }).join(" / ");
   }
 
