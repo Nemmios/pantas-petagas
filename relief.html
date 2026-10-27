@@ -326,6 +326,23 @@
   const stafOf = n => staf.find(s => s.nama === n);
   const tidakHadir = (n, a, b) => ctx.kbHari.some(k => k.nama === n && (([x, y]) => x < b && a < y)(tetingkap(k)));
   const mengajar = (n, a, b) => J.filter(r => r.hari === ctx.h && r.guru.includes(n) && r.a < b && a < r.b);
+  // elektif (satu baris, beberapa guru, cth RC/SS): teka subjek setiap guru daripada subjek yang diajarnya seorang diri
+  // dalam jadual (cth Christine ada kelas SS sendiri → Christine = SS, Mark = RC). null jika tidak pasti.
+  function subjekElektif(r) {
+    const sub = String(r.subj || "").split(/\s*(?:\/|&)\s*/).filter(Boolean);
+    if (sub.length < 2 || sub.length !== r.guru.length) return null;
+    const solo = g => new Set(J.filter(x => x.guru.length === 1 && x.guru[0] === g).map(x => x.subj));
+    const peta = {}, bakiS = new Set(sub), bakiG = new Set(r.guru);
+    for (let ubah = true; ubah && bakiG.size;) {
+      ubah = false;
+      for (const g of [...bakiG]) {
+        const c = [...bakiS].filter(x => solo(g).has(x));
+        if (c.length === 1 && ![...bakiG].some(h => h !== g && solo(h).has(c[0]))) { peta[g] = c[0]; bakiG.delete(g); bakiS.delete(c[0]); ubah = true; }
+      }
+      if (bakiG.size === 1 && bakiS.size === 1) { peta[[...bakiG][0]] = [...bakiS][0]; bakiG.clear(); }
+    }
+    return peta;
+  }
   // kelas gabung: guru yang sama mengajar subjek yang sama kepada beberapa kelas serentak (cth PM 1 ALNAIR + 1 ARCTURUS) — satu guru ganti sahaja
   const kunciGabung = x => `${x.guru_asal}|${x.sesi}|${x.a}|${x.b}|${x.subj}`;
   const sekumpulan = (x, y) => !!x && !!y && kunciGabung(x) === kunciGabung(y);
@@ -399,8 +416,14 @@
       // kelas dipecah: PI/PM serentak (baris berasingan) atau elektif (satu baris, beberapa guru, cth RC/SS)
       const serentak = J.filter(r => r.hari === ctx.h && r.kelas === sl.kelas && r.sesi === sl.sesi && r.w === sl.w);
       const subjLain = serentak.filter(r => !r.guru.includes(sl.guru_asal) && r.guru.some(g => !tidakHadir(g, r.a, r.b))).map(r => r.subj);
-      const rakan = serentak.filter(r => r.guru.includes(sl.guru_asal)).flatMap(r => r.guru).filter(g => g !== sl.guru_asal && !tidakHadir(g, sl.a, sl.b));
-      if (rakan.length) nota.push(`Elektif: ganti kumpulan ${P.namaPendek(sl.guru_asal)} sahaja (${[...new Set(rakan)].map(g => P.namaPendek(g)).join(", ")} mengajar kumpulan lain)`);
+      const baris0 = serentak.find(r => r.guru.includes(sl.guru_asal));
+      const rakan = (baris0 ? baris0.guru : []).filter(g => g !== sl.guru_asal && !tidakHadir(g, sl.a, sl.b));
+      if (rakan.length) {
+        const peta = subjekElektif(baris0) || {}, sj = g => (peta[g] ? peta[g] + " – " : "");
+        nota.push(peta[sl.guru_asal]
+          ? `Elektif: ganti kumpulan ${peta[sl.guru_asal]} sahaja (${rakan.map(g => sj(g) + P.namaPendek(g)).join(", ")} seperti biasa)`
+          : `Elektif: ganti kumpulan ${P.namaPendek(sl.guru_asal)} sahaja (${rakan.map(g => sj(g) + P.namaPendek(g)).join(", ")} mengajar kumpulan lain)`);
+      }
       if (subjLain.length) nota.push(`Kumpulan ${sl.subj} sahaja (${[...new Set(subjLain)].join(", ")} diajar seperti biasa)`);
       const adik = baris.find(y => sekumpulan(y, x));
       baris.push(x);
