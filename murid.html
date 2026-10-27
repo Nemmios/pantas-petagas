@@ -239,7 +239,7 @@
 
       const [hadir, sebab, ponteng, susulan, selesai, surat, penjaga, aktiviti] = await Promise.all([
         P.db.pilih("kehadiran", `select=tarikh,status,masa_tiba,idme_siap&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc`),
-        P.db.pilih("sebab_tidak_hadir", `select=tarikh_mula,tarikh_akhir,catatan,sumber,minta_jumpa,status,dihantar_pada,kat:idme_kategori(nama),sbb:idme_sebab(nama)&murid_id=eq.${P.q(id)}&tarikh_akhir=gte.${dari}&tarikh_mula=lte.${hingga}&order=tarikh_mula.desc`),
+        P.db.pilih("sebab_tidak_hadir", `select=tarikh_mula,tarikh_akhir,catatan,sumber,minta_jumpa,isu_keselamatan,status,dihantar_pada,kat:idme_kategori(nama),sbb:idme_sebab(nama)&murid_id=eq.${P.q(id)}&tarikh_akhir=gte.${dari}&tarikh_mula=lte.${hingga}&order=tarikh_mula.desc`),
         P.db.pilih("ponteng_kelas", `select=tarikh,waktu,subjek,status,catatan,pelapor:pengguna!ponteng_kelas_dilapor_oleh_fkey(nama)&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,waktu`),
         P.db.pilih("tindakan_susulan", `select=jenis,tarikh,catatan&murid_id=eq.${P.q(id)}${julat("tarikh")}&order=tarikh.desc,id.desc`),
         m.kelas_id ? P.db.pilih("kelas_selesai", `select=tarikh&kelas_id=eq.${m.kelas_id}${julat("tarikh")}`) : [],
@@ -342,9 +342,9 @@
         const hadirJuga = hari.filter(t => !thSet.has(t) && new Date(t + "T00:00:00Z").getUTCDay() % 6 !== 0 && t <= P.hariIni());
         const julatT = s.tarikh_mula === s.tarikh_akhir ? P.tarikhCantik(s.tarikh_mula) : `${P.tarikhCantik(s.tarikh_mula)} – ${P.tarikhCantik(s.tarikh_akhir)}`;
         return `<div class="murid"><span class="nama"><b>${julatT}</b>
-          <small style="color:var(--teks-2)">${P.esc(s.kat ? s.kat.nama : "Ingin berbincang dengan guru kelas")}${s.sbb ? " · " + P.esc(s.sbb.nama) : ""}
+          <small style="color:var(--teks-2)">${P.esc(s.kat ? s.kat.nama : s.isu_keselamatan ? "Isu keselamatan — ibu bapa mohon guru hubungi" : "Ingin berbincang dengan guru kelas")}${s.sbb ? " · " + P.esc(s.sbb.nama) : ""}
           · ${s.sumber === "GURU" ? "Direkod guru" : "Ibu bapa"}${s.catatan ? " · " + P.esc(s.catatan) : ""}</small></span>
-          <span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${s.minta_jumpa ? `<span class="cip info">Minta jumpa</span>` : ""}
+          <span style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${s.isu_keselamatan ? `<span class="cip th">🚨 Isu keselamatan</span>` : s.minta_jumpa ? `<span class="cip info">Minta jumpa</span>` : ""}
           ${s.status === "DITOLAK" ? `<span class="cip th">Ditolak</span>` : ""}${hadirJuga.length ? `<span class="cip lw">Murid hadir ${hadirJuga.length} hari</span>` : ""}</span></div>`;
       }).join("") : `<div class="muat">Tiada sebab dihantar.</div>`;
 

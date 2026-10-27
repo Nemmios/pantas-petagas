@@ -48,6 +48,8 @@
         <select id="kategori" required><option value="">— Pilih kategori —</option></select>
         <label for="sebab">Sebab</label>
         <select id="sebab" required disabled><option value="">— Pilih kategori dahulu —</option></select>
+        <div id="notaIsu" class="mesej amaran tersembunyi" style="margin-top:8px"><b>Guru kelas akan menghubungi anda secepat mungkin.</b><br>
+          Anda tidak perlu menulis butiran di sini. Jika ada bahaya segera, hubungi <b>999</b> atau balai polis terdekat.</div>
       </div>
 
       <label class="semak"><input type="checkbox" id="jumpa"> <span>Sebab lain / saya ingin berbincang secara peribadi dengan guru kelas</span></label>
@@ -96,20 +98,37 @@
   }
   const huruf = s => s.toLowerCase().replace(/(^|[\s(/])\S/g, c => c.toUpperCase()).replace(/\bHfmd\b/, "HFMD").replace(/\bMc\b/, "MC");
 
+  // Pilihan khas dalam Ancaman Keselamatan: tiada sebab idMe dipilih; guru kelas menghubungi ibu bapa
+  const ISU = "ISU";
+  const kategoriKeselamatan = k => { const x = kategori.find(c => c.id === k); return !!x && x.nama === "ANCAMAN KESELAMATAN"; };
+  const pilihIsu = () => $("#sebab").value === ISU;
+  function kemasIsu() {
+    const isu = pilihIsu();
+    $("#notaIsu").classList.toggle("tersembunyi", !isu);
+    $("#catatan").placeholder = isu ? "Pilihan. Tidak perlu tulis butiran — guru kelas akan menghubungi anda."
+      : $("#jumpa").checked ? "Nyatakan secara ringkas (pilihan). Guru kelas akan menghubungi anda." : "cth Ada surat MC dari Klinik Kesihatan Putatan";
+  }
+
   $("#kategori").addEventListener("change", () => {
     const k = +$("#kategori").value, s = $("#sebab");
     const list = sebab.filter(x => x.kategori_id === k);
+    const isu = kategoriKeselamatan(k);
     s.disabled = !k;
     s.innerHTML = k ? `<option value="">— Pilih sebab —</option>` + list.map(x => `<option value="${x.id}">${P.esc(huruf(x.nama))}</option>`).join("")
+                      + (isu ? `<option value="${ISU}">Isu keselamatan lain — mohon guru hubungi saya</option>` : "")
                     : `<option value="">— Pilih kategori dahulu —</option>`;
-    if (list.length === 1) s.value = list[0].id;
+    if (list.length === 1 && !isu) s.value = list[0].id;
+    kemasIsu();
   });
+  $("#sebab").addEventListener("change", kemasIsu);
 
   $("#jumpa").addEventListener("change", () => {
     const j = $("#jumpa").checked;
     $("#kotakSebab").classList.toggle("tersembunyi", j);
     $("#kategori").required = $("#sebab").required = !j;
+    if (j) $("#notaIsu").classList.add("tersembunyi");
     $("#catatan").placeholder = j ? "Nyatakan secara ringkas (pilihan). Guru kelas akan menghubungi anda." : "cth Ada surat MC dari Klinik Kesihatan Putatan";
+    if (!j) kemasIsu();
   });
 
   // LANGKAH 1
@@ -148,15 +167,16 @@
     const pilih = document.querySelector("input[name=anak]:checked");
     if (!pilih) return mesej("#m2", "ralat", "Sila pilih anak.");
     const jumpa = $("#jumpa").checked;
-    const sebabId = jumpa ? null : +$("#sebab").value;
-    if (!jumpa && !sebabId) return mesej("#m2", "ralat", "Sila pilih kategori dan sebab.");
+    const isu = !jumpa && pilihIsu();
+    const sebabId = jumpa || isu ? null : +$("#sebab").value;
+    if (!jumpa && !isu && !sebabId) return mesej("#m2", "ralat", "Sila pilih kategori dan sebab.");
     if ($("#akhir").value < $("#mula").value) return mesej("#m2", "ralat", "Tarikh 'Hingga' mesti sama atau selepas tarikh 'Dari'.");
     $("#bHantar").disabled = true;
     try {
-      const id = await P.db.rpc("hantar_sebab", {
-        p_ic: ic, p_tel: tel, p_murid_id: pilih.value, p_tarikh_mula: $("#mula").value, p_tarikh_akhir: $("#akhir").value,
-        p_sebab_id: sebabId, p_catatan: $("#catatan").value.trim() || null, p_minta_jumpa: jumpa,
-      });
+      const asas = { p_ic: ic, p_tel: tel, p_murid_id: pilih.value, p_tarikh_mula: $("#mula").value, p_tarikh_akhir: $("#akhir").value,
+        p_catatan: $("#catatan").value.trim() || null };
+      const id = isu ? await P.db.rpc("hantar_isu_keselamatan", asas)
+        : await P.db.rpc("hantar_sebab", { ...asas, p_sebab_id: sebabId, p_minta_jumpa: jumpa });
       if (!id) { mesej("#m2", "ralat", "Pengesahan gagal. Sila mulakan semula."); return; }
       const a = anak.find(x => x.murid_id === pilih.value);
       const s = sebab.find(x => x.id === sebabId);
@@ -165,7 +185,7 @@
       $("#ringkas").innerHTML = `<table><tbody>
         <tr><th>Murid</th><td>${P.esc(a.nama)}<br><small>${P.esc(a.kelas)}</small></td></tr>
         <tr><th>Tarikh</th><td>${P.esc(tempoh)}</td></tr>
-        <tr><th>Sebab</th><td>${jumpa ? "Ingin berbincang dengan guru kelas" : P.esc(huruf(s.nama))}</td></tr>
+        <tr><th>Sebab</th><td>${isu ? "Isu keselamatan — guru kelas akan menghubungi anda" : jumpa ? "Ingin berbincang dengan guru kelas" : P.esc(huruf(s.nama))}</td></tr>
         <tr><th>No. rujukan</th><td>#${id}</td></tr></tbody></table>`;
       tunjuk("l3"); window.scrollTo(0, 0);
     } catch (e) { mesej("#m2", "ralat", e.message); }
@@ -173,7 +193,7 @@
   });
 
   $("#bLagi").addEventListener("click", () => {
-    $("#fSebab").reset(); $("#jumpa").dispatchEvent(new Event("change"));
+    $("#fSebab").reset(); $("#jumpa").dispatchEvent(new Event("change")); $("#notaIsu").classList.add("tersembunyi");
     $("#mula").value = $("#akhir").value = hari; $("#sebab").disabled = true;
     const r = document.querySelector("input[name=anak]"); if (r) r.checked = true;
     tunjuk("l2");

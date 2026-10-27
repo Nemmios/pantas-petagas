@@ -498,14 +498,14 @@
         const ids = inList(murid.map(m => m.id));
         const [hadir, sebab, selesai, memo] = await Promise.all([
           P.db.pilih("kehadiran", `select=murid_id,status&tarikh=eq.${tarikh}&murid_id=${ids}`),
-          P.db.pilih("sebab_tidak_hadir", `select=murid_id,minta_jumpa,sumber,idme_sebab(nama)&murid_id=${ids}&tarikh_mula=lte.${tarikh}&tarikh_akhir=gte.${tarikh}&status=neq.DITOLAK&order=dihantar_pada.desc`),
+          P.db.pilih("sebab_tidak_hadir", `select=murid_id,minta_jumpa,sumber,isu_keselamatan,idme_sebab(nama)&murid_id=${ids}&tarikh_mula=lte.${tarikh}&tarikh_akhir=gte.${tarikh}&status=neq.DITOLAK&order=dihantar_pada.desc`),
           P.db.pilih("kelas_selesai", `select=pada&tarikh=eq.${tarikh}&kelas_id=eq.${kid}`),
           ambilMemo(murid.map(m => m.id), tarikh),
         ]);
         aktivitiMurid = {};
         memo.forEach(x => { (aktivitiMurid[x.murid_id] = aktivitiMurid[x.murid_id] || []).push(`${ikonMemo(x.memo)} ${huruf(x.memo.nama)} · ${teksWaktu(x.memo)}`); });
         hadir.forEach(h => { tanda[h.murid_id] = h.status; asal[h.murid_id] = h.status; });
-        sebab.forEach(s => { if (!sebabIbuBapa[s.murid_id]) sebabIbuBapa[s.murid_id] = s.minta_jumpa && !s.idme_sebab ? "Ibu bapa minta berbincang" : huruf(s.idme_sebab && s.idme_sebab.nama); });
+        sebab.forEach(s => { if (!sebabIbuBapa[s.murid_id]) sebabIbuBapa[s.murid_id] = s.isu_keselamatan && !s.idme_sebab ? "🚨 Isu keselamatan — guru kelas hubungi ibu bapa" : s.minta_jumpa && !s.idme_sebab ? "Ibu bapa minta berbincang" : huruf(s.idme_sebab && s.idme_sebab.nama); });
         const st = $("#status");
         if (selesai.length) { st.className = "cip ok"; st.textContent = "Sudah dihantar " + new Date(selesai[0].pada).toLocaleTimeString("ms-MY", { hour: "2-digit", minute: "2-digit" }); }
         else { st.className = "cip"; st.textContent = "Belum dihantar"; }
@@ -599,7 +599,7 @@
   }
 
   // ---------- inbox guru kelas ----------
-  const IKON_INBOX = { KEHADIRAN: "📋", SEBAB: "👪", JUMPA: "💬", AMARAN: "⚠️", BALIK: "🏠" };
+  const IKON_INBOX = { KEHADIRAN: "📋", SEBAB: "👪", JUMPA: "💬", KESELAMATAN: "🚨", AMARAN: "⚠️", BALIK: "🏠" };
   let inboxData = [];
   const masaInbox = iso => {
     const d = new Date(new Date(iso).getTime() + 8 * 3600e3), t = d.toISOString().slice(0, 10);
@@ -657,6 +657,10 @@
       }
       if (x.jenis === "SEBAB") butiran = `${P.tarikhCantik(x.tarikh, true)} · ${butiran}`;
       if (x.jenis === "JUMPA") butiran = `${P.tarikhCantik(x.tarikh, true)} · <b>${butiran}</b>`;
+      if (x.jenis === "KESELAMATAN") {
+        butiran = `${P.tarikhCantik(x.tarikh, true)} · <b style="color:var(--merah, #c0392b)">${butiran}</b>`;
+        tindakan = `<div class="tindakan"><span class="cip th">Hubungi segera</span></div>`;
+      }
       if (x.jenis === "BALIK") butiran = `Balik awal · ${P.tarikhCantik(x.tarikh, true)} · ${butiran}`;
       if (x.jenis === "AMARAN") tindakan = `<div class="tindakan"><span class="cip th">Susul segera</span></div>`;
       return `<div class="item-inbox"><div class="ikon">${IKON_INBOX[x.jenis] || "•"}</div><div class="isi">
@@ -1097,6 +1101,7 @@
       $("#senaraiKelasku").className = "";
       $("#senaraiKelasku").innerHTML = perlu.length ? perlu.map(r => {
         const label = r.keadaan === "BELUM_ADA_SEBAB" ? `<span class="cip th">Belum ada sebab</span>`
+          : r.isu_keselamatan && r.keadaan === "PERLU_GURU_KELAS" ? `<span class="cip th">🚨 Isu keselamatan — hubungi segera</span>`
           : r.keadaan === "PERLU_GURU_KELAS" ? `<span class="cip lw">Ibu bapa minta berbincang</span>` : `<span class="cip info">Perlu semakan</span>`;
         const wa = (tel[r.murid_id] || []).map(p => {
           const t = `Salam sejahtera ${p.hubungan ? huruf(p.hubungan) : "tuan/puan"}. Untuk makluman, ${r.murid} (${r.kelas}) tidak hadir ke sekolah pada ${P.tarikhCantik(r.tarikh, true)}. ` +

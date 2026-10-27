@@ -55,6 +55,11 @@
 
     <!-- HARIAN -->
     <div id="pHarian">
+      <div class="kad tersembunyi" id="kKeselamatan" style="border-left:4px solid var(--merah, #c0392b)">
+        <h2>🚨 Isu keselamatan & rekod sulit (14 hari)</h2>
+        <p class="nota">Isu keselamatan daripada ibu bapa, dan sebab sulit (buli, seksual, diculik, hilang, kongsi gelap, ugutan). Hanya guru kelas, HEM, Petugas dan Admin boleh lihat. Rekod tindakan susulan dalam Profil murid.</p>
+        <div id="senaraiKeselamatan"></div>
+      </div>
       <div class="statistik" id="statistik"></div>
       <div class="kad">
         <h2>Status kelas</h2>
@@ -597,7 +602,22 @@
     return cacheJadual[hari];
   }
 
+  async function muatKeselamatan() {
+    try {
+      const r = await P.db.rpc("isu_keselamatan_terkini", { p_hari: 14 }) || [];
+      $("#kKeselamatan").classList.toggle("tersembunyi", !r.length);
+      $("#senaraiKeselamatan").innerHTML = r.map(x => {
+        const tempoh = x.tarikh_mula === x.tarikh_akhir ? P.tarikhCantik(x.tarikh_mula, true) : `${P.tarikhCantik(x.tarikh_mula)} – ${P.tarikhCantik(x.tarikh_akhir)}`;
+        const apa = x.jenis === "ISU_KESELAMATAN" ? "Ibu bapa mohon guru hubungi (isu keselamatan)" : huruf(x.sebab || "");
+        return `<div class="murid"><span class="nama"><b>${P.pautMurid(x.murid_id, x.murid)}</b>
+          <small style="color:var(--teks-2)">${P.esc(x.kelas)} · ${P.esc(tempoh)} · ${P.esc(apa)}${x.catatan ? " · " + P.esc(x.catatan) : ""} · ${x.sumber === "GURU" ? "Direkod guru" : "Ibu bapa"}</small></span>
+          ${x.susulan ? `<span class="cip ok">${x.susulan} susulan</span>` : `<span class="cip th">Belum disusul</span>`}</div>`;
+      }).join("");
+    } catch { $("#kKeselamatan").classList.add("tersembunyi"); /* fungsi belum dipasang */ }
+  }
+
   async function muatHarian() {
+    muatKeselamatan();
     $("#statistik").innerHTML = `<div class="muat">Memuatkan…</div>`;
     try {
       const t = $("#tarikh").value;
