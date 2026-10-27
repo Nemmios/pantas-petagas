@@ -317,7 +317,10 @@
     // guru dua alam: berada di sekolah ikut sesi kelasnya hari itu (cara 2)
     const sesiGuru = {};
     J.filter(r => r.hari === h).forEach(r => r.guru.forEach(g => (sesiGuru[g] = sesiGuru[g] || new Set()).add(r.sesi)));
-    return { tarikh, sesi, h, kbHari, rlSesi: rlHari.filter(r => r.sesi === sesi), lain, bulan, minggu, ajarHari, ajarMinggu, cuti, had, sesiGuru };
+    // waktu pertama setiap kelas hari itu — guru ganti waktu ini perlu ambil kehadiran
+    const pertama = {};
+    J.filter(r => r.hari === h).forEach(r => { if (!(r.kelas in pertama) || r.w < pertama[r.kelas]) pertama[r.kelas] = r.w; });
+    return { tarikh, sesi, h, kbHari, rlSesi: rlHari.filter(r => r.sesi === sesi), lain, bulan, minggu, ajarHari, ajarMinggu, cuti, had, sesiGuru, pertama };
   }
   const stafOf = n => staf.find(s => s.nama === n);
   const tidakHadir = (n, a, b) => ctx.kbHari.some(k => k.nama === n && (([x, y]) => x < b && a < y)(tetingkap(k)));
@@ -384,8 +387,11 @@
       const x = { tarikh: ctx.tarikh, sesi: sl.sesi, kelas: sl.kelas, w: sl.w, a: sl.a, b: sl.b, subj: sl.subj, guru_asal: sl.guru_asal, keberadaan_id: sl.keberadaan_id, guru_ganti: null, jenis: "TIADA_GURU", nota: "" };
       baris.push(x);
       const c = calon(x);
-      if (c.length) { x.guru_ganti = c[0].s.nama; x.jenis = "RELIEF"; if (c[0].s.jenis === "KAUNSELOR") x.nota = "Guru B&K: boleh jalankan aktiviti bimbingan"; }
-      else x.nota = "Tiada guru free";
+      const nota = [];
+      if (ctx.pertama[sl.kelas] === sl.w) nota.push("Waktu pertama: ambil kehadiran");
+      if (c.length) { x.guru_ganti = c[0].s.nama; x.jenis = "RELIEF"; if (c[0].s.jenis === "KAUNSELOR") nota.push("Guru B&K: boleh jalankan aktiviti bimbingan"); }
+      else nota.push("Tiada guru free");
+      x.nota = nota.join(" · ");
     }
     statusSimpan = null;
     lukisRelief(true);

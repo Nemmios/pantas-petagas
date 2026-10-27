@@ -19,6 +19,10 @@
   #kInbox .isi small { display: block; color: var(--teks-2); }
   #kInbox .baru-titik { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: var(--emas, #d4a017); margin-right: 6px; vertical-align: middle; }
   #kInbox .tindakan { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .slot.relief { border-color: var(--emas); border-style: dashed; }
+  .slot.relief b::after { content: " · RELIEF"; font-size: 11px; color: var(--emas); font-weight: 700; }
+  .relief-esok { margin: 10px 0 0; padding: 9px 12px; border: 1px dashed var(--emas); border-radius: 10px; font-size: 13.5px; }
+  .relief-esok div + div { margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -81,6 +85,7 @@
       </div>
       <p class="nota" id="jadualNota" style="margin:6px 0 10px"></p>
       <div id="jadualCip" class="jadual-cip"></div>
+      <div id="reliefAkan" class="relief-esok tersembunyi"></div>
       <div id="jadualPilih" class="tersembunyi">
         <label for="jadualNama">Pilih nama anda seperti dalam jadual waktu</label>
         <select id="jadualNama"></select>
@@ -398,7 +403,7 @@
   const jam = t => (t ? t.slice(0, 5) : "");
   const guruSlot = s => String(s.guru_penuh || "").split(" / ").map(x => x.trim()).filter(Boolean);
   const kelasIkutNama = n => semuaKelas.find(k => k.nama === n);
-  let jadualHari = [], namaJadual = "", subjekAuto = true, adminJadual = false;
+  let jadualHari = [], reliefSaya = [], namaJadual = "", subjekAuto = true, adminJadual = false;
 
   // padankan nama pengguna dengan nama penuh dalam jadual (tanpa BIN/BINTI, MOHD, NUR dsb.)
   function cariNama(nama, calon) {
@@ -417,6 +422,9 @@
     try { jadualHari = await P.db.pilih("jadual_waktu", `select=sesi,kelas,waktu,mula,tamat,subjek,guru,guru_penuh&hari=eq.${hari}&order=waktu`); }
     catch { jadualHari = []; }
     if (!jadualHari.length) return;          // jadual belum dimuat naik — aplikasi berfungsi seperti biasa
+    // relief yang telah disahkan: hari ini + 7 hari akan datang
+    try { reliefSaya = (await P.db.pilih("relief", `select=tarikh,sesi,kelas,waktu,mula,tamat,subjek,guru_asal,guru_ganti,jenis,nota&status=eq.SAH&tarikh=gte.${P.hariIni()}&tarikh=lte.${P.tambahHari(P.hariIni(), 7)}&order=tarikh,mula`)).map(r => ({ ...r, relief: true })); }
+    catch { reliefSaya = []; }
     const semuaGuru = [...new Set(jadualHari.flatMap(guruSlot))].sort();
     // nama jadual ditetapkan oleh ADMIN (pengguna.nama_jadual); jika belum, cuba padan automatik
     P.simpan.del("pantas.namaJadual");       // buang pilihan lama yang disimpan di telefon
@@ -431,7 +439,17 @@
     paparJadual();
   }
 
-  const slotSaya = () => (namaJadual ? jadualHari.filter(s => guruSlot(s).includes(namaJadual)) : []);
+  // guru waktu pertama: jika ada relief yang disahkan, tunjuk guru ganti
+  function labelGuruPertama(g, r) {
+    if (r && r.jenis === "RELIEF") return `🔁 ${P.esc(r.guru_ganti)} (relief)`;
+    if (r && r.jenis === "TIADA_GURU") return `${P.esc(g.guru || g.subjek)} tidak hadir · tiada guru ganti`;
+    if (r && r.jenis === "DIBATALKAN") return `${P.esc(g.guru || g.subjek)} tidak hadir · kelas dibatalkan`;
+    return P.esc(g.guru || g.subjek);
+  }
+  const slotSaya = () => (namaJadual ? [
+    ...jadualHari.filter(s => guruSlot(s).includes(namaJadual)),
+    ...reliefSaya.filter(r => r.tarikh === P.hariIni() && r.guru_ganti === namaJadual)
+  ].sort((a, b) => minit(a.mula) - minit(b.mula)) : []);
   function slotKini() {
     const t = minitKini();
     return slotSaya().find(s => minit(s.mula) - 10 <= t && t < minit(s.tamat)) || null;
@@ -441,8 +459,8 @@
     const blok = [];
     for (const s of slotSaya()) {
       const b = blok[blok.length - 1];
-      if (b && b.kelas === s.kelas && b.subjek === s.subjek && b.akhir.waktu === s.waktu - 1) { b.akhir = s; b.slot.push(s); }
-      else blok.push({ kelas: s.kelas, subjek: s.subjek, sesi: s.sesi, awal: s, akhir: s, slot: [s] });
+      if (b && b.kelas === s.kelas && b.subjek === s.subjek && !!b.relief === !!s.relief && b.akhir.waktu === s.waktu - 1) { b.akhir = s; b.slot.push(s); }
+      else blok.push({ kelas: s.kelas, subjek: s.subjek, sesi: s.sesi, relief: !!s.relief, guru_asal: s.guru_asal, awal: s, akhir: s, slot: [s] });
     }
     return blok;
   }
@@ -453,16 +471,20 @@
       $("#jadualNota").textContent = adminJadual
         ? "Nama anda belum dipadankan dengan jadual waktu. Pilih nama anda di bawah."
         : "Nama anda belum dipadankan dengan jadual waktu. Minta admin tetapkan di halaman HEM → Tetapan → Pengguna sistem.";
-      $("#jadualCip").innerHTML = ""; return;
+      $("#jadualCip").innerHTML = ""; $("#reliefAkan").classList.add("tersembunyi"); return;
     }
+    const akan = reliefSaya.filter(r => r.tarikh > P.hariIni() && r.guru_ganti === namaJadual);
+    $("#reliefAkan").classList.toggle("tersembunyi", !akan.length);
+    $("#reliefAkan").innerHTML = akan.length ? `<b>🔔 Relief akan datang</b>` + akan.map(r =>
+      `<div>${P.tarikhCantik(r.tarikh, true)} · W${r.waktu} ${jam(r.mula)}–${jam(r.tamat)} · <b>${P.esc(r.kelas)}</b> ${P.esc(r.subjek || "")} · ganti ${P.esc(P.namaPendek(r.guru_asal))}${r.nota ? ` · <i>${P.esc(r.nota)}</i>` : ""}</div>`).join("") : "";
     $("#jadualNota").innerHTML = blok.length
       ? `${P.esc(namaJadual)} · Tekan kelas untuk isi borang secara automatik.`
       : `${P.esc(namaJadual)} · Tiada kelas dalam jadual hari ini.`;
     $("#jadualCip").innerHTML = blok.map((b, i) => {
       const w = b.awal.waktu === b.akhir.waktu ? `W${b.awal.waktu}` : `W${b.awal.waktu}–${b.akhir.waktu}`;
       const kls = b.slot.includes(kini) ? "kini" : t >= minit(b.akhir.tamat) ? "lepas" : "";
-      return `<button type="button" class="slot ${kls}" data-i="${i}"><small>${w} · ${jam(b.awal.mula)}–${jam(b.akhir.tamat)}</small>
-        <b>${P.esc(b.kelas)}</b><small>${P.esc(b.subjek)}${kls === "kini" ? " · sekarang" : ""}</small></button>`;
+      return `<button type="button" class="slot ${kls}${b.relief ? " relief" : ""}" data-i="${i}"><small>${w} · ${jam(b.awal.mula)}–${jam(b.akhir.tamat)}</small>
+        <b>${P.esc(b.kelas)}</b><small>${P.esc(b.subjek || "")}${b.relief ? ` · ganti ${P.esc(String(b.guru_asal || "").split(" ").slice(0, 2).join(" "))}` : ""}${kls === "kini" ? " · sekarang" : ""}</small></button>`;
     }).join("");
     $("#jadualCip").querySelectorAll(".slot").forEach(el => el.addEventListener("click", () => {
       const b = blok[+el.dataset.i], s = b.slot.find(x => x === kini) || b.awal;
@@ -1072,7 +1094,8 @@
           return `<div class="siap lm-klik" data-t="${kini}" data-k="${P.esc(k.nama)}" style="text-decoration:none">${P.esc(k.nama)}<small>TH ${bil} · ${jam}</small></div>`;
         }
         const g = pertama[k.nama];
-        return `<div class="belum">${P.esc(k.nama)}<small>Belum diambil</small>${g ? `<small class="guru">W${g.waktu} · ${P.esc(g.guru || g.subjek)}</small>` : ""}</div>`;
+        const r = g && reliefSaya.find(x => x.tarikh === kini && x.kelas === k.nama && x.waktu === g.waktu);
+        return `<div class="belum">${P.esc(k.nama)}<small>Belum diambil</small>${g ? `<small class="guru">W${g.waktu} · ${labelGuruPertama(g, r)}</small>` : ""}</div>`;
       }).join("");
     } catch (e) { $("#lmGridHari").innerHTML = `<div class="mesej ralat" style="grid-column:1/-1">${P.esc(e.message)}</div>`; }
   }
