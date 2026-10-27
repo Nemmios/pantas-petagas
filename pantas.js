@@ -138,7 +138,9 @@ const PANTAS = (() => {
     async pengguna() {
       if (!sesi) return null;
       let r;
-      try { r = await db.pilih("pengguna", `select=id,nama,peranan,kelas_id,nama_jadual&id=eq.${sesi.user.id}`); }
+      try { r = await db.pilih("pengguna", `select=id,nama,peranan,kelas_id,nama_jadual,inbox_dibaca&id=eq.${sesi.user.id}`); }
+      catch { r = null; }
+      if (!r) try { r = await db.pilih("pengguna", `select=id,nama,peranan,kelas_id,nama_jadual&id=eq.${sesi.user.id}`); }
       catch { r = await db.pilih("pengguna", `select=id,nama,peranan,kelas_id&id=eq.${sesi.user.id}`); } // lajur nama_jadual belum wujud
       if (this.perluTukar) await dialogTukarKata(true);     // kata laluan sementara daripada admin
       return r && r[0] ? r[0] : null;

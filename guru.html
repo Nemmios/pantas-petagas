@@ -7,11 +7,25 @@
 <meta name="theme-color" content="#1a2433">
 <link rel="icon" href="logo-petagas.png">
 <link rel="stylesheet" href="pantas.css">
+<style>
+  /* Inbox guru kelas */
+  .kepala #bInbox { position: relative; font-size: 18px; padding: 6px 10px; }
+  .kepala #bInbox .lencana { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+    background: var(--merah, #dc2626); color: #fff; font-size: 12px; font-weight: 700; line-height: 20px; text-align: center; }
+  #kInbox .item-inbox { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid var(--garis, rgba(127,127,127,.25)); }
+  #kInbox .item-inbox:first-of-type { border-top: 0; }
+  #kInbox .ikon { font-size: 20px; line-height: 1.2; width: 26px; text-align: center; flex: none; }
+  #kInbox .isi { flex: 1; min-width: 0; }
+  #kInbox .isi small { display: block; color: var(--teks-2); }
+  #kInbox .baru-titik { display: inline-block; width: 8px; height: 8px; border-radius: 4px; background: var(--emas, #d4a017); margin-right: 6px; vertical-align: middle; }
+  #kInbox .tindakan { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+</style>
 </head>
 <body>
 <header class="kepala">
   <a class="ke-utama" href="./" aria-label="Kembali ke halaman utama PANTAS Petagas"><span class="anak-panah">‹</span><img src="logo-petagas.png" alt="">
   <div class="tajuk"><b>PANTAS Guru</b><small id="siapa">SMK Petagas</small></div></a>
+  <button id="bInbox" class="tersembunyi" type="button" aria-label="Inbox kelas saya">🔔<span id="inboxBil" class="lencana tersembunyi"></span></button>
   <button id="bKeluar" class="tersembunyi">Keluar</button>
 </header>
 
@@ -39,6 +53,16 @@
 
   <!-- APLIKASI -->
   <section id="vApp" class="tersembunyi">
+    <!-- INBOX GURU KELAS -->
+    <div id="kInbox" class="kad tersembunyi">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <h2 style="margin:0">🔔 Inbox <span id="inboxKelas"></span></h2>
+        <button class="btn garis kecil" id="bTutupInbox" type="button">Tutup</button>
+      </div>
+      <p class="nota" style="margin:4px 0 6px">Makluman 7 hari lepas untuk kelas anda: kehadiran yang disimpan guru lain, sebab daripada ibu bapa dan calon surat amaran.</p>
+      <div id="senaraiInbox" class="muat">Memuatkan…</div>
+    </div>
+
     <div class="tab" id="tabUtama">
       <button class="aktif" data-v="tanda">Tanda kehadiran</button>
       <button data-v="ponteng">Ponteng kelas</button>
@@ -86,12 +110,14 @@
       </div>
 
       <div id="kSelepas" class="kad tersembunyi">
-        <h2>Mesej untuk grup WhatsApp kelas</h2>
-        <p class="nota">Murid tidak hadir yang belum ada sebab daripada ibu bapa.</p>
-        <textarea id="teksGrup" rows="7" readonly></textarea>
-        <div class="baris" style="margin-top:10px">
-          <button class="btn garis" id="bSalinGrup">Salin mesej</button>
-          <a class="btn wa" id="bWaGrup" target="_blank" rel="noopener">Kongsi ke WhatsApp</a>
+        <h2 id="kSelepasTajuk">Mesej untuk grup WhatsApp kelas</h2>
+        <p class="nota" id="kSelepasNota">Murid tidak hadir yang belum ada sebab daripada ibu bapa.</p>
+        <div id="kSelepasWa">
+          <textarea id="teksGrup" rows="7" readonly></textarea>
+          <div class="baris" style="margin-top:10px">
+            <button class="btn garis" id="bSalinGrup">Salin mesej</button>
+            <a class="btn wa" id="bWaGrup" target="_blank" rel="noopener">Kongsi ke WhatsApp</a>
+          </div>
         </div>
       </div>
     </div>
@@ -300,6 +326,7 @@
     isiKelas(kAwal ? kAwal.id : "");
     if (saya.kelas_id) { $("#tKelasku").classList.remove("tersembunyi"); $("#tajukKelasku").textContent = `Kelas saya: ${kSaya ? kSaya.nama : ""}`; }
     if (kAwal) muatSenarai();
+    semakInbox();
   }
 
   // ---------- jadual waktu ----------
@@ -506,15 +533,97 @@
     const k = semuaKelas.find(x => x.id === +$("#kelas").value);
     const tiada = murid.filter(m => tanda[m.id] === "TIDAK_HADIR" && !sebabIbuBapa[m.id]);
     if (!tiada.length) { $("#kSelepas").classList.add("tersembunyi"); return; }
-    const teks = `*${k.nama} · ${P.tarikhCantik($("#tarikh").value, true)}*\n` +
-      `Murid tidak hadir yang belum ada sebab:\n` + tiada.map((m, i) => `${i + 1}. ${m.nama}`).join("\n") +
-      `\n\nIbu bapa/penjaga dimohon mengisi sebab di pautan berikut:\n${PAUTAN_BORANG}\n\nTerima kasih.`;
+    const teks = mesejGrup(k.nama, $("#tarikh").value, tiada.map(m => m.nama));
     $("#teksGrup").value = teks;
     $("#bWaGrup").href = "https://wa.me/?text=" + encodeURIComponent(teks);
+    // Mesej grup ibu bapa hanya untuk guru kelas bagi kelasnya sendiri.
+    // Guru lain (cth guru waktu pertama): guru kelas menerima makluman dalam Inbox PANTAS.
+    const kelasSendiri = k.id === saya.kelas_id;
+    $("#kSelepasTajuk").textContent = kelasSendiri ? "Mesej untuk grup WhatsApp kelas" : "✅ Guru kelas telah dimaklumkan";
+    $("#kSelepasNota").innerHTML = kelasSendiri ? "Murid tidak hadir yang belum ada sebab daripada ibu bapa."
+      : `${tiada.length} murid ${P.esc(k.nama)} tidak hadir tanpa sebab. Senarai ini dihantar kepada guru kelas${k.guru_kelas ? ` (<b>${P.esc(P.namaPendek(k.guru_kelas))}</b>)` : ""} melalui <b>Inbox PANTAS</b>. Anda tidak perlu menghantar WhatsApp.`;
+    $("#kSelepasWa").classList.toggle("tersembunyi", !kelasSendiri);
     $("#kSelepas").classList.remove("tersembunyi");
     $("#kSelepas").scrollIntoView({ behavior: "smooth", block: "start" });
   }
   $("#bSalinGrup").addEventListener("click", () => P.salin($("#teksGrup").value).then(() => P.toast("Mesej disalin")));
+  function mesejGrup(kelas, tarikh, nama) {
+    return `*${kelas} · ${P.tarikhCantik(tarikh, true)}*\n` +
+      `Murid tidak hadir yang belum ada sebab:\n` + nama.map((n, i) => `${i + 1}. ${n}`).join("\n") +
+      `\n\nIbu bapa/penjaga dimohon mengisi sebab di pautan berikut:\n${PAUTAN_BORANG}\n\nTerima kasih.`;
+  }
+
+  // ---------- inbox guru kelas ----------
+  const IKON_INBOX = { KEHADIRAN: "📋", SEBAB: "👪", JUMPA: "💬", AMARAN: "⚠️" };
+  let inboxData = [];
+  const masaInbox = iso => {
+    const d = new Date(new Date(iso).getTime() + 8 * 3600e3), t = d.toISOString().slice(0, 10);
+    const jam = d.toISOString().slice(11, 16);
+    return (t === P.hariIni() ? "Hari ini" : P.tarikhCantik(t, true)) + ", " + jam;
+  };
+  const baruInbox = x => !saya.inbox_dibaca || new Date(x.pada) > new Date(saya.inbox_dibaca);
+  async function semakInbox() {
+    if (!saya || !saya.kelas_id) return;
+    try {
+      inboxData = await P.db.rpc("inbox_guru", { p_hari: 7 }) || [];
+      const n = inboxData.filter(baruInbox).length;
+      $("#bInbox").classList.remove("tersembunyi");
+      $("#inboxBil").textContent = n > 99 ? "99+" : n;
+      $("#inboxBil").classList.toggle("tersembunyi", !n);
+    } catch { /* fungsi inbox belum dipasang — butang kekal tersembunyi */ }
+  }
+  async function bukaInbox() {
+    const k = semuaKelas.find(x => x.id === saya.kelas_id);
+    $("#inboxKelas").textContent = k ? "· " + k.nama : "";
+    $("#kInbox").classList.remove("tersembunyi");
+    $("#kInbox").scrollIntoView({ behavior: "smooth", block: "start" });
+    $("#senaraiInbox").className = "muat"; $("#senaraiInbox").textContent = "Memuatkan…";
+    await semakInbox();
+    // senarai murid tanpa sebab untuk mesej grup (disediakan awal supaya butang Salin terus berfungsi)
+    let tanpa = {};
+    const hk = inboxData.filter(x => x.jenis === "KEHADIRAN").map(x => x.tarikh);
+    if (k && hk.length) {
+      try {
+        const r = await P.db.pilih("v_tak_hadir", `select=tarikh,murid&kelas=eq.${P.q(k.nama)}&tarikh=gte.${hk.reduce((a, b) => (a < b ? a : b))}&status=eq.TIDAK_HADIR&keadaan=eq.BELUM_ADA_SEBAB&order=murid`);
+        r.forEach(x => (tanpa[x.tarikh] = tanpa[x.tarikh] || []).push(x.murid));
+      } catch { tanpa = {}; }
+    }
+    $("#senaraiInbox").className = "";
+    $("#senaraiInbox").innerHTML = inboxData.length ? inboxData.map((x, i) => {
+      let tajuk = x.jenis === "KEHADIRAN" ? P.esc(x.tajuk) : P.pautMurid(x.murid_id, x.tajuk);
+      let butiran = P.esc(x.butiran || "");
+      let tindakan = "";
+      if (x.jenis === "KEHADIRAN") {
+        butiran = `${P.tarikhCantik(x.tarikh, true)} · <b>${x.bil || 0} tidak hadir</b> · ` + butiran;
+        const senarai = tanpa[x.tarikh] || [];
+        if (senarai.length && k) {
+          const teks = mesejGrup(k.nama, x.tarikh, senarai);
+          tindakan = `<div class="tindakan"><button class="btn garis kecil ib-salin" data-i="${i}">Salin mesej grup</button>
+            <a class="btn wa kecil" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(teks)}">Kongsi ke WhatsApp</a></div>`;
+          x._teks = teks;
+        }
+      }
+      if (x.jenis === "SEBAB") butiran = `${P.tarikhCantik(x.tarikh, true)} · ${butiran}`;
+      if (x.jenis === "JUMPA") butiran = `${P.tarikhCantik(x.tarikh, true)} · <b>${butiran}</b>`;
+      if (x.jenis === "AMARAN") tindakan = `<div class="tindakan"><span class="cip th">Susul segera</span></div>`;
+      return `<div class="item-inbox"><div class="ikon">${IKON_INBOX[x.jenis] || "•"}</div><div class="isi">
+        <b>${baruInbox(x) ? `<span class="baru-titik" title="Baru"></span>` : ""}${tajuk}</b><small>${butiran}</small><small>${masaInbox(x.pada)}</small>${tindakan}</div></div>`;
+    }).join("") : `<div class="muat">Tiada makluman dalam 7 hari lepas.</div>`;
+    // tanda dibaca (ikut akaun, semua peranti)
+    try {
+      const t = await P.db.rpc("tanda_inbox_dibaca");
+      saya.inbox_dibaca = typeof t === "string" ? t : new Date().toISOString();
+      $("#inboxBil").classList.add("tersembunyi");
+    } catch { /* abaikan */ }
+  }
+  $("#bInbox").addEventListener("click", () => ($("#kInbox").classList.contains("tersembunyi") ? bukaInbox() : $("#kInbox").classList.add("tersembunyi")));
+  $("#bTutupInbox").addEventListener("click", () => $("#kInbox").classList.add("tersembunyi"));
+  $("#senaraiInbox").addEventListener("click", e => {
+    const b = e.target.closest(".ib-salin"); if (!b) return;
+    const x = inboxData[+b.dataset.i]; if (x && x._teks) P.salin(x._teks).then(() => P.toast("Mesej disalin. Tampal di grup WhatsApp kelas."));
+  });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) semakInbox(); });
+  setInterval(() => { if (!document.hidden) semakInbox(); }, 120000);
 
   // ---------- kelas saya ----------
   document.querySelectorAll("#tabUtama button").forEach(b => b.addEventListener("click", () => {
