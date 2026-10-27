@@ -108,7 +108,7 @@
           <button class="btn garis" id="bSalinMesej" type="button" disabled>Salin mesej grup</button>
           <button class="btn garis" id="bCetak" type="button" disabled>Cetak / PDF</button>
         </div>
-        <p class="nota tiada-cetak" style="margin:10px 0 0">Peraturan: guru <b>sesi sendiri</b> sahaja (guru dua alam layak kedua-dua sesi) · tidak mengajar atau ada relief lain pada masa itu (pagi &amp; petang disemak) · tidak dalam senarai keberadaan · guru B&amp;K maksimum ikut had seminggu · keutamaan: paling sedikit relief hari ini, kemudian 30 hari lepas, kemudian paling kurang waktu mengajar. Guru yang sama dikekalkan untuk waktu berturut-turut di kelas yang sama jika boleh.</p>
+        <p class="nota tiada-cetak" style="margin:10px 0 0">Peraturan: guru <b>sesi sendiri</b> sahaja (guru dua alam hanya dalam masa sesi kelasnya hari itu, cth kelas pagi sahaja → hingga tamat sesi pagi) · tidak mengajar atau ada relief lain pada masa itu (pagi &amp; petang disemak) · tidak dalam senarai keberadaan · guru B&amp;K maksimum ikut had seminggu · keutamaan: paling sedikit relief hari ini, kemudian 30 hari lepas, kemudian paling kurang waktu mengajar. Guru yang sama dikekalkan untuk waktu berturut-turut di kelas yang sama jika boleh.</p>
       </div>
     </div>
 
@@ -285,7 +285,13 @@
       ajarMinggu[g] = (ajarMinggu[g] || 0) + 1; if (r.hari === h) ajarHari[g] = (ajarHari[g] || 0) + 1;
     }));
     const lain = rlHari.filter(r => r.sesi !== sesi && r.jenis === "RELIEF" && r.guru_ganti);
-    return { tarikh, sesi, h, kbHari, rlSesi: rlHari.filter(r => r.sesi === sesi), lain, bulan, minggu, ajarHari, ajarMinggu, cuti };
+    // had masa setiap sesi pada hari itu (cth pagi 07:00–14:30, petang 12:00–17:50)
+    const had = {};
+    J.filter(r => r.hari === h).forEach(r => { const x = had[r.sesi] = had[r.sesi] || [1440, 0]; x[0] = Math.min(x[0], r.a); x[1] = Math.max(x[1], r.b); });
+    // guru dua alam: berada di sekolah ikut sesi kelasnya hari itu (cara 2)
+    const sesiGuru = {};
+    J.filter(r => r.hari === h).forEach(r => r.guru.forEach(g => (sesiGuru[g] = sesiGuru[g] || new Set()).add(r.sesi)));
+    return { tarikh, sesi, h, kbHari, rlSesi: rlHari.filter(r => r.sesi === sesi), lain, bulan, minggu, ajarHari, ajarMinggu, cuti, had, sesiGuru };
   }
   const stafOf = n => staf.find(s => s.nama === n);
   const tidakHadir = (n, a, b) => ctx.kbHari.some(k => k.nama === n && (([x, y]) => x < b && a < y)(tetingkap(k)));
@@ -294,9 +300,18 @@
     ...baris.filter(x => x !== kecuali && x.jenis === "RELIEF")].filter(r => r.guru_ganti === n && r.a < b && a < r.b);
   const reliefHariIni = (n, kecuali) => baris.filter(x => x !== kecuali && x.jenis === "RELIEF" && x.guru_ganti === n).length + ctx.lain.filter(r => r.guru_ganti === n).length;
   const reliefMinggu = (n, kecuali) => (ctx.minggu[n] || 0) + reliefHariIni(n, kecuali);
+  // julat masa guru berada di sekolah pada hari itu
+  function berada(s) {
+    const sesiList = s.sesi === "KEDUA" ? [...(ctx.sesiGuru[s.nama] || [])] : [s.sesi];
+    const j = sesiList.map(x => ctx.had[x]).filter(Boolean);
+    if (!j.length) return null;
+    return [Math.min(...j.map(x => x[0])), Math.max(...j.map(x => x[1]))];
+  }
+  function dalamMasa(s, slot) { const w = berada(s); return !!w && w[0] <= slot.a && slot.b <= w[1]; }
   function layak(s, slot) {
     if (!s.aktif || s.dikecualikan) return false;
     if (!(s.sesi === "KEDUA" || s.sesi === slot.sesi)) return false;
+    if (s.sesi === "KEDUA" && !dalamMasa(s, slot)) return false;
     if (s.nama === slot.guru_asal || tidakHadir(s.nama, slot.a, slot.b)) return false;
     if (mengajar(s.nama, slot.a, slot.b).length) return false;
     if (reliefLain(s.nama, slot.a, slot.b, slot).length) return false;
@@ -320,6 +335,7 @@
     if (s && s.dikecualikan) o.push("Dikecualikan daripada relief");
     if (s && s.had_mingguan != null && reliefMinggu(n, x) + 1 > s.had_mingguan) o.push(`Melebihi had ${s.had_mingguan} waktu seminggu`);
     if (s && !(s.sesi === "KEDUA" || s.sesi === x.sesi)) o.push(`Guru sesi ${huruf(s.sesi)}`);
+    if (s && s.sesi === "KEDUA" && !dalamMasa(s, x)) { const w = berada(s); o.push(w ? `Guru dua alam: biasanya di sekolah ${hm(w[0])}–${hm(w[1])} hari ini` : "Guru dua alam: tiada kelas hari ini"); }
     if (!s) o.push("Tiada dalam senarai staf");
     return o;
   }
