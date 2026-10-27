@@ -40,6 +40,7 @@
       <button data-v="idme">Senarai idMe</button>
       <button data-v="surat" class="hem">Surat amaran</button>
       <button data-v="ponteng" class="hem">Ponteng kelas</button>
+      <button data-v="balik" class="hem">Balik awal</button>
       <button data-v="laporan" class="hem">Laporan</button>
       <button data-v="tetapan" class="hem">Tetapan</button>
       <button data-v="profil">Profil murid</button>
@@ -119,6 +120,42 @@
         <div class="jadual-bungkus"><table class="kad-mobile">
           <thead><tr><th>Murid</th><th>Kelas</th><th class="angka">Ponteng kelas</th><th class="angka">Lewat</th></tr></thead>
           <tbody id="jKekerapan"></tbody></table></div>
+      </div>
+    </div>
+
+    <!-- BALIK AWAL -->
+    <div id="pBalik" class="tersembunyi">
+      <div class="kad">
+        <h2>🏠 Balik awal pada tarikh ini</h2>
+        <p class="nota">Direkod oleh guru bertugas selepas ibu bapa dihubungi, borang ditandatangani dan pengambil disahkan (4 digit akhir No. KP).</p>
+        <div class="ringkasan" id="ringkasBalik"></div>
+        <div class="jadual-bungkus"><table class="kad-mobile">
+          <thead><tr><th>Masa</th><th>Kelas</th><th>Murid</th><th>Sebab</th><th>Diambil oleh</th><th>Direkod oleh</th><th></th></tr></thead>
+          <tbody id="jBalik"></tbody></table></div>
+      </div>
+      <div class="kad" id="kBalikSemak">
+        <h2>Perlu semakan HEM</h2>
+        <p class="nota">Murid dilepaskan kepada pengambil yang <b>bukan penjaga berdaftar</b> (pengecualian). Semak dan sahkan, atau daftarkan penjaga tersebut.</p>
+        <div class="jadual-bungkus"><table class="kad-mobile">
+          <thead><tr><th>Tarikh</th><th>Kelas</th><th>Murid</th><th>Pengambil</th><th>Sebab pengecualian</th><th></th></tr></thead>
+          <tbody id="jBalikSemak"></tbody></table></div>
+      </div>
+      <div class="kad">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap">
+          <div><h2>Corak balik awal</h2><p class="nota" style="margin:0">Mengikut hari dan sebab. Perhatikan hari yang menonjol (cth hari kokurikulum).</p></div>
+          <div><label for="baTempoh">Tempoh</label><select id="baTempoh"><option value="30">30 hari</option><option value="90" selected>90 hari</option><option value="180">180 hari</option><option value="366">Setahun</option></select></div>
+        </div>
+        <div class="baris" style="margin-top:12px;align-items:flex-start">
+          <div><h3 style="margin:0 0 6px;font-size:14px">Hari</h3><div id="baHari"></div></div>
+          <div><h3 style="margin:0 0 6px;font-size:14px">Sebab</h3><div id="baJenisCarta"></div></div>
+        </div>
+      </div>
+      <div class="kad">
+        <h2>Murid kerap balik awal</h2>
+        <p class="nota">🚩 = 3 kali atau lebih dalam 30 hari, atau 60% daripada balik awalnya jatuh pada hari yang sama (sekurang-kurangnya 3 kali). Sesuai untuk dipanggil kaunseling / dihubungi ibu bapa.</p>
+        <div class="jadual-bungkus"><table class="kad-mobile">
+          <thead><tr><th>Murid</th><th>Kelas</th><th class="angka">Jumlah</th><th class="angka">30 hari</th><th>Hari kerap</th><th>Sebab kerap</th><th>Terakhir</th></tr></thead>
+          <tbody id="jBalikKerap"></tbody></table></div>
       </div>
     </div>
 
@@ -422,6 +459,81 @@
     P.muatTurunCsv(`laporan_murid_${$("#bulan").value}.csv`, [["id_murid", "nama", "kelas", "sesi", "tidak_hadir", "tanpa_sebab", "lewat", "ponteng_kelas"],
       ...lapMurid.map(x => [x.murid_id, x.murid, x.kelas, x.sesi, x.tidak_hadir, x.tanpa_sebab, x.lewat, x.ponteng_kelas])]);
   });
+  // ---------- balik awal ----------
+  const JENIS_BALIK = { SAKIT: "Sakit", KECEMASAN_KELUARGA: "Kecemasan keluarga", TEMUJANJI: "Temujanji", URUSAN_RASMI: "Urusan rasmi", LAIN: "Lain-lain" };
+  const CARA_BALIK = { PANGGILAN: "panggilan", WHATSAPP: "WhatsApp", DATANG_SENDIRI: "datang sendiri" };
+  const HARI_BALIK = ["Isnin", "Selasa", "Rabu", "Khamis", "Jumaat", "Sabtu", "Ahad"];
+  const BA_PILIH = "id,tarikh,masa_keluar,waktu,sebab_jenis,sebab,dihubungi_cara,pengambil_nama,pengambil_hubungan,ic4_sepadan,pengecualian,perlu_semakan,catatan,murid_id,murid(nama,kelas(nama,sesi)),perekod:pengguna!balik_awal_dicatat_oleh_fkey(nama)";
+  const bar = (label, n, maks, warna) => `<div style="display:flex;align-items:center;gap:8px;margin:3px 0;font-size:13px">
+    <span style="width:118px;flex:none">${P.esc(label)}</span>
+    <span style="flex:1;background:var(--garis);border-radius:6px;height:14px;overflow:hidden"><span style="display:block;height:100%;width:${maks ? Math.round(n / maks * 100) : 0}%;background:${warna}"></span></span>
+    <b style="width:28px;text-align:right;font-variant-numeric:tabular-nums">${n}</b></div>`;
+  async function muatBalik() {
+    $("#jBalik").innerHTML = `<tr><td colspan="7" class="muat">Memuatkan…</td></tr>`;
+    const hari = +$("#baTempoh").value || 90;
+    try {
+      const [harini, semak, tempoh, kerap] = await Promise.all([
+        P.db.pilih("balik_awal", `select=${BA_PILIH}&tarikh=eq.${$("#tarikh").value}&order=masa_keluar`),
+        P.db.pilih("balik_awal", `select=${BA_PILIH}&perlu_semakan=is.true&order=tarikh.desc,masa_keluar`),
+        P.db.pilih("balik_awal", `select=tarikh,sebab_jenis,murid(kelas(sesi))&tarikh=gte.${P.tambahHari(P.hariIni(), -hari)}`),
+        P.db.rpc("analisis_balik_awal", { p_hari: hari }),
+      ]);
+      const sesi = $("#sesi").value, ikutSesi = x => !sesi || (x.murid && x.murid.kelas && x.murid.kelas.sesi === sesi);
+      const r = harini.filter(ikutSesi), sm = semak.filter(ikutSesi), t = tempoh.filter(ikutSesi);
+      const kelasNama = x => P.esc(x.murid && x.murid.kelas ? x.murid.kelas.nama : "—");
+      $("#ringkasBalik").innerHTML = `<span class="cip">Balik awal ${r.length}</span>` +
+        Object.entries(JENIS_BALIK).map(([k, l]) => [l, r.filter(x => x.sebab_jenis === k).length]).filter(([, n]) => n).map(([l, n]) => `<span class="cip info">${l} ${n}</span>`).join("") +
+        (r.some(x => x.perlu_semakan) ? `<span class="cip lw">Perlu semakan ${r.filter(x => x.perlu_semakan).length}</span>` : "");
+      $("#jBalik").innerHTML = r.length ? r.map(x => `<tr>
+        <td data-label="Masa">${x.masa_keluar.slice(0, 5)}${x.waktu ? `<br><small style="color:var(--teks-2)">Waktu ${x.waktu}</small>` : ""}</td>
+        <td data-label="Kelas">${kelasNama(x)}</td>
+        <td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid && x.murid.nama)}</b></td>
+        <td data-label="Sebab">${P.esc(JENIS_BALIK[x.sebab_jenis] || x.sebab_jenis)} › ${P.esc(x.sebab)}${x.catatan ? `<br><small style="color:var(--teks-2)">${P.esc(x.catatan)}</small>` : ""}</td>
+        <td data-label="Diambil oleh">${P.esc(x.pengambil_nama)}<br><small style="color:var(--teks-2)">${P.esc(huruf(x.pengambil_hubungan))} · ${x.ic4_sepadan ? "IC disahkan ✓" : `<span style="color:var(--oren)">pengecualian</span>`}</small></td>
+        <td data-label="Direkod oleh">${P.esc(x.perekod ? P.namaPendek(x.perekod.nama) : "—")}<br><small style="color:var(--teks-2)">dihubungi: ${P.esc(CARA_BALIK[x.dihubungi_cara] || "")}</small></td>
+        <td data-label="">${x.perlu_semakan ? `<span class="cip lw">Perlu semakan</span>` : ""}</td></tr>`).join("")
+        : `<tr><td colspan="7" class="muat">Tiada murid balik awal pada tarikh ini.</td></tr>`;
+      $("#jBalikSemak").innerHTML = sm.length ? sm.map(x => `<tr data-id="${x.id}">
+        <td data-label="Tarikh">${P.tarikhCantik(x.tarikh, true)}<br><small style="color:var(--teks-2)">${x.masa_keluar.slice(0, 5)} · ${P.esc(x.perekod ? P.namaPendek(x.perekod.nama) : "")}</small></td>
+        <td data-label="Kelas">${kelasNama(x)}</td>
+        <td data-label="Murid"><b>${P.pautMurid(x.murid_id, x.murid && x.murid.nama)}</b></td>
+        <td data-label="Pengambil">${P.esc(x.pengambil_nama)}<br><small style="color:var(--teks-2)">${P.esc(huruf(x.pengambil_hubungan))}</small></td>
+        <td data-label="Sebab pengecualian">${P.esc(x.pengecualian || "—")}</td>
+        <td data-label=""><button class="btn utama kecil ba-sah">Sahkan</button></td></tr>`).join("")
+        : `<tr><td colspan="6" class="muat">Tiada rekod menunggu semakan. ✓</td></tr>`;
+      // corak hari & sebab
+      const kiraHari = [0, 0, 0, 0, 0, 0, 0];
+      t.forEach(x => { kiraHari[(new Date(x.tarikh + "T00:00:00").getDay() + 6) % 7]++; });
+      const hariAktif = HARI_BALIK.map((h, i) => [h, kiraHari[i]]).filter(([, n], i) => i < 5 || n);
+      const maksH = Math.max(0, ...hariAktif.map(([, n]) => n)), jum = t.length;
+      $("#baHari").innerHTML = jum ? hariAktif.map(([h, n]) => bar(h + (n === maksH && jum >= 5 && n / jum >= 0.35 ? " ⚠" : ""), n, maksH, n === maksH ? "var(--oren)" : "var(--biru-muda)")).join("")
+        + `<p class="nota" style="margin:6px 0 0">Jumlah ${jum} kali dalam ${hari} hari.</p>` : `<div class="muat">Tiada rekod.</div>`;
+      const kiraJ = Object.entries(JENIS_BALIK).map(([k, l]) => [l, t.filter(x => x.sebab_jenis === k).length]);
+      const maksJ = Math.max(0, ...kiraJ.map(([, n]) => n));
+      $("#baJenisCarta").innerHTML = jum ? kiraJ.map(([l, n]) => bar(l, n, maksJ, "var(--biru-muda)")).join("") : `<div class="muat">Tiada rekod.</div>`;
+      // murid kerap
+      const k = (kerap || []).filter(x => !sesi || kelas.some(c => c.nama === x.kelas && c.sesi === sesi));
+      $("#jBalikKerap").innerHTML = k.length ? k.slice(0, 60).map(x => `<tr${x.bendera ? ` style="background:var(--oren-lembut)"` : ""}>
+        <td data-label="Murid"><b>${x.bendera ? "🚩 " : ""}${P.pautMurid(x.murid_id, x.murid)}</b>${x.bendera ? `<br><small style="color:var(--oren)">${P.esc(x.bendera)}</small>` : ""}</td>
+        <td data-label="Kelas">${P.esc(x.kelas)}</td>
+        <td class="angka" data-label="Jumlah">${x.bil}</td><td class="angka" data-label="30 hari">${x.bil_30}</td>
+        <td data-label="Hari kerap">${P.esc(x.hari_kerap)} (${x.bil_hari_kerap}×)</td>
+        <td data-label="Sebab kerap">${P.esc(x.sebab_kerap)}</td>
+        <td data-label="Terakhir">${P.tarikhCantik(x.terakhir, true)}</td></tr>`).join("")
+        : `<tr><td colspan="7" class="muat">Tiada rekod balik awal dalam tempoh ini.</td></tr>`;
+    } catch (e) {
+      const m = /balik_awal|analisis_balik_awal/.test(e.message || "") && /exist|find|schema/i.test(e.message || "") ? "Jadual balik awal belum dipasang dalam pangkalan data." : e;
+      ralat("#jBalik", m, 7);
+    }
+  }
+  $("#baTempoh").addEventListener("change", muatBalik);
+  $("#jBalikSemak").addEventListener("click", async e => {
+    const b = e.target.closest(".ba-sah"); if (!b) return;
+    b.disabled = true;
+    try { await P.db.rpc("semak_balik_awal", { p_id: +b.closest("tr").dataset.id }); P.toast("Rekod disahkan"); muatBalik(); }
+    catch (err) { P.toast(err.message, "ralat"); b.disabled = false; }
+  });
+
   $("#bCetak").addEventListener("click", () => window.print());
 
   async function mula() {
@@ -445,7 +557,7 @@
     $("#kTarikh").classList.toggle("tersembunyi", paparan === "laporan");
     $("#kBulan").classList.toggle("tersembunyi", paparan !== "laporan");
     document.querySelector(".kad.alat").classList.toggle("tersembunyi", paparan === "tetapan");
-    ["harian", "idme", "surat", "ponteng", "laporan", "tetapan"].forEach(v => {
+    ["harian", "idme", "surat", "ponteng", "balik", "laporan", "tetapan"].forEach(v => {
       const el = $("#p" + v[0].toUpperCase() + v.slice(1)); if (el) el.classList.toggle("tersembunyi", v !== paparan);
     });
     muat();
@@ -459,6 +571,7 @@
     if (paparan === "surat") return muatSurat();
     if (paparan === "tetapan") return muatTetapan();
     if (paparan === "ponteng") return muatPonteng();
+    if (paparan === "balik") return muatBalik();
     if (paparan === "laporan") return muatLaporan();
   }
 
