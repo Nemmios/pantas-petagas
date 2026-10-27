@@ -153,10 +153,10 @@
     <div id="pStaf" class="tersembunyi">
       <div class="kad">
         <h2>Senarai staf untuk relief</h2>
-        <p class="nota">Nama mesti sama seperti dalam jadual waktu. <b>Dikecualikan</b> = tidak dipilih untuk relief (cth Pengetua). <b>Had seminggu</b> = had relief (cth guru B&amp;K: 8).</p>
+        <p class="nota">Nama mesti sama seperti dalam jadual waktu. <b>Dikecualikan</b> = tidak dipilih untuk relief (cth Pengetua). <b>Had seminggu</b> = had relief (cth guru B&amp;K: 8). <b>Subjek elektif</b> = subjek guru dalam kelas elektif berkongsi (cth RC/SS → Christine: SS) supaya nota relief tepat.</p>
         <div class="baris tiada-cetak" style="margin-bottom:10px"><button class="btn garis kecil" id="bSelaras" type="button">Tambah nama baharu daripada jadual waktu</button></div>
         <div class="jadual-bungkus"><table class="padat kad-mobile">
-          <thead><tr><th>Nama</th><th>Sesi</th><th>Jenis</th><th>Dikecualikan</th><th>Had seminggu</th><th>Aktif</th><th>Catatan</th><th></th></tr></thead>
+          <thead><tr><th>Nama</th><th>Sesi</th><th>Jenis</th><th>Dikecualikan</th><th>Had seminggu</th><th>Aktif</th><th>Subjek elektif</th><th>Catatan</th><th></th></tr></thead>
           <tbody id="sBaris"></tbody></table></div>
       </div>
       <div class="kad">
@@ -331,13 +331,16 @@
   function subjekElektif(r) {
     const sub = String(r.subj || "").split(/\s*(?:\/|&)\s*/).filter(Boolean);
     if (sub.length < 2 || sub.length !== r.guru.length) return null;
-    const solo = g => new Set(J.filter(x => x.guru.length === 1 && x.guru[0] === g).map(x => x.subj));
+    // subjek elektif yang ditetapkan dalam Senarai staf diutamakan; jika tiada, guna subjek yang diajar seorang diri
+    const nyata = g => String((stafOf(g) || {}).subjek_elektif || "").toUpperCase().split(/[\s,\/]+/).filter(Boolean);
+    const solo = g => J.filter(x => x.guru.length === 1 && x.guru[0] === g).map(x => x.subj);
     const peta = {}, bakiS = new Set(sub), bakiG = new Set(r.guru);
+    const calonS = g => { const n = nyata(g).filter(x => bakiS.has(x)); return n.length ? n : [...new Set(solo(g))].filter(x => bakiS.has(x)); };
     for (let ubah = true; ubah && bakiG.size;) {
       ubah = false;
       for (const g of [...bakiG]) {
-        const c = [...bakiS].filter(x => solo(g).has(x));
-        if (c.length === 1 && ![...bakiG].some(h => h !== g && solo(h).has(c[0]))) { peta[g] = c[0]; bakiG.delete(g); bakiS.delete(c[0]); ubah = true; }
+        const c = calonS(g);
+        if (c.length === 1 && ![...bakiG].some(h => h !== g && calonS(h).includes(c[0]))) { peta[g] = c[0]; bakiG.delete(g); bakiS.delete(c[0]); ubah = true; }
       }
       if (bakiG.size === 1 && bakiS.size === 1) { peta[[...bakiG][0]] = [...bakiS][0]; bakiG.clear(); }
     }
@@ -547,6 +550,7 @@
       <td data-label="Dikecualikan"><input type="checkbox" class="s-kecuali" ${s.dikecualikan ? "checked" : ""} style="width:20px;height:20px"></td>
       <td data-label="Had"><input type="number" class="s-had" min="0" max="40" value="${s.had_mingguan ?? ""}" style="max-width:80px"></td>
       <td data-label="Aktif"><input type="checkbox" class="s-aktif" ${s.aktif ? "checked" : ""} style="width:20px;height:20px"></td>
+      <td data-label="Subjek elektif"><input class="s-elektif" value="${P.esc(s.subjek_elektif || "")}" maxlength="30" placeholder="cth SS" style="max-width:90px"></td>
       <td data-label="Catatan"><input class="s-cat" value="${P.esc(s.catatan || "")}" maxlength="120"></td>
       <td data-label=""><button class="btn utama kecil s-simpan" type="button">Simpan</button></td></tr>`).join("");
   }
@@ -555,7 +559,7 @@
     const tr = b.closest("tr"), s = staf[+tr.dataset.i];
     const nilai = { sesi: tr.querySelector(".s-sesi").value, jenis: tr.querySelector(".s-jenis").value, dikecualikan: tr.querySelector(".s-kecuali").checked,
       had_mingguan: tr.querySelector(".s-had").value === "" ? null : +tr.querySelector(".s-had").value, aktif: tr.querySelector(".s-aktif").checked,
-      catatan: tr.querySelector(".s-cat").value.trim() || null, dikemaskini: new Date().toISOString() };
+      catatan: tr.querySelector(".s-cat").value.trim() || null, subjek_elektif: tr.querySelector(".s-elektif").value.trim().toUpperCase() || null, dikemaskini: new Date().toISOString() };
     b.disabled = true;
     try { await P.db.kemaskini("staf_relief", `nama=eq.${P.q(s.nama)}`, nilai); Object.assign(s, nilai); P.toast("Disimpan"); }
     catch (err) { P.toast(err.message, "ralat"); } finally { b.disabled = false; }
