@@ -39,6 +39,8 @@
       <label for="nama">Nama</label>
       <input id="nama" list="senaraiNama" placeholder="Taip nama anda…" required>
       <datalist id="senaraiNama"></datalist>
+      <div id="namaLain"></div>
+      <button type="button" class="btn garis kecil" id="bTambahNama" style="margin-top:8px">＋ Tambah guru lain (cth kursus / lawatan berkumpulan)</button>
       <div class="baris">
         <div><label for="mula">Dari tarikh</label><input id="mula" type="date" required></div>
         <div><label for="akhir">Hingga tarikh</label><input id="akhir" type="date" required></div>
@@ -66,7 +68,8 @@
       <button class="btn emas penuh" id="bHantar">Hantar</button>
     </form>
     <section id="kSiap" class="kad tersembunyi">
-      <div class="mesej ok" style="margin-top:0"><b>Dihantar.</b> Menunggu kelulusan pentadbir.</div>
+      <div class="mesej ok" style="margin-top:0"><b>Dihantar.</b> Menunggu kelulusan pentadbir. <span id="siapBil"></span></div>
+      <div id="siapGagal"></div>
       <p class="nota">Mesej untuk grup Keberadaan Guru (jika masih diperlukan):</p>
       <textarea id="teksGrup" rows="9" readonly></textarea>
       <div class="baris" style="margin-top:10px">
@@ -129,6 +132,17 @@
     $("#kMasa").classList.toggle("tersembunyi", document.querySelector('input[name="masa"]:checked').value !== "separuh")));
   $("#cipPerkara").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { $("#perkara").value = b.textContent; $("#perkara").focus(); } });
   $("#nama").addEventListener("change", () => { const n = namaSah(); if (n) { $("#nama").value = n; P.simpan.set(KUNCI_NAMA, n); } });
+  // guru lain dalam borang yang sama (keberadaan berkumpulan)
+  $("#bTambahNama").addEventListener("click", () => {
+    if ($("#namaLain").children.length >= 14) return P.toast("Maksimum 15 orang sekali hantar", "ralat");
+    const d = document.createElement("div");
+    d.style.cssText = "display:flex;gap:8px;margin-top:8px;align-items:center";
+    d.innerHTML = `<input class="nama-lain" list="senaraiNama" placeholder="Nama guru lain…" style="flex:1;min-width:0"><button type="button" class="btn garis kecil buang-nama" aria-label="Buang" style="flex:0 0 auto">✕</button>`;
+    $("#namaLain").appendChild(d); d.querySelector("input").focus();
+  });
+  $("#namaLain").addEventListener("click", e => { const b = e.target.closest(".buang-nama"); if (b) b.parentElement.remove(); });
+  $("#namaLain").addEventListener("change", e => { if (!e.target.classList.contains("nama-lain")) return;
+    const n = e.target.value.trim().toUpperCase(); if (staf.find(s => s.nama === n)) e.target.value = n; });
 
   async function mula() {
     try {
@@ -153,6 +167,10 @@
     e.preventDefault();
     const salah = t => { $("#mBorang").innerHTML = `<div class="mesej ralat">${P.esc(t)}</div>`; };
     const nama = namaSah(); if (!nama) return salah("Pilih nama anda daripada senarai.");
+    const lain = [...document.querySelectorAll(".nama-lain")].map(i => i.value.trim().toUpperCase()).filter(Boolean);
+    const salahNama = lain.filter(n => !staf.find(s => s.nama === n));
+    if (salahNama.length) return salah(`Nama tidak dijumpai: ${salahNama.join(", ")}. Pilih daripada senarai.`);
+    const semua = [...new Set([nama, ...lain])];
     const sepanjang = document.querySelector('input[name="masa"]:checked').value === "penuh";
     const d = { nama, mula: $("#mula").value, akhir: $("#akhir").value, sepanjang, masaMula: $("#masaMula").value, masaAkhir: $("#masaAkhir").value,
       perkara: $("#perkara").value.trim(), tempat: $("#tempat").value.trim(), kebenaran: $("#kebenaran").value.trim() };
@@ -160,16 +178,25 @@
     if (!sepanjang && (!d.masaMula || !d.masaAkhir || d.masaAkhir <= d.masaMula)) return salah("Nyatakan masa mula dan masa tamat yang betul.");
     if (d.perkara.length < 3) return salah("Nyatakan perkara.");
     $("#bHantar").disabled = true; $("#mBorang").innerHTML = "";
-    try {
-      await P.db.rpc("hantar_keberadaan", { p_nama: nama, p_tarikh_mula: d.mula, p_tarikh_akhir: d.akhir, p_sepanjang: sepanjang,
-        p_masa_mula: sepanjang ? null : d.masaMula, p_masa_akhir: sepanjang ? null : d.masaAkhir,
-        p_perkara: d.perkara, p_tempat: d.tempat || null, p_kebenaran: d.kebenaran || null });
+    const berjaya = [], gagal = [];
+    for (const n of semua) {
+      try {
+        await P.db.rpc("hantar_keberadaan", { p_nama: n, p_tarikh_mula: d.mula, p_tarikh_akhir: d.akhir, p_sepanjang: sepanjang,
+          p_masa_mula: sepanjang ? null : d.masaMula, p_masa_akhir: sepanjang ? null : d.masaAkhir,
+          p_perkara: d.perkara, p_tempat: d.tempat || null, p_kebenaran: d.kebenaran || null });
+        berjaya.push(n);
+      } catch (err) { gagal.push(`${n}: ${err.message}`); }
+    }
+    if (berjaya.length) {
       P.simpan.set(KUNCI_NAMA, nama);
-      const t = mesejGrup(d);
+      const t = berjaya.map(n => mesejGrup({ ...d, nama: n })).join("\n\n— — —\n\n");
       $("#teksGrup").value = t; $("#bWa").href = "https://wa.me/?text=" + encodeURIComponent(t);
+      $("#siapBil").textContent = berjaya.length > 1 ? `${berjaya.length} orang: ${berjaya.join(", ")}` : "";
+      $("#siapGagal").innerHTML = gagal.length ? `<div class="mesej ralat">Tidak dihantar: ${gagal.map(P.esc).join("<br>")}</div>` : "";
+      $("#namaLain").innerHTML = "";
       $("#fBorang").classList.add("tersembunyi"); $("#kSiap").classList.remove("tersembunyi");
-    } catch (err) { salah(err.message); }
-    finally { $("#bHantar").disabled = false; }
+    } else salah(gagal.join(" · "));
+    $("#bHantar").disabled = false;
   });
   $("#bSalin").addEventListener("click", () => P.salin($("#teksGrup").value).then(() => P.toast("Mesej disalin")));
   $("#bLagi").addEventListener("click", () => {
