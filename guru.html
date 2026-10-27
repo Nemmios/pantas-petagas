@@ -81,7 +81,8 @@
     <div id="kJadual" class="kad tersembunyi">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
         <h2 style="margin:0">Jadual saya hari ini</h2>
-        <button class="btn garis kecil tersembunyi" id="bTukarNama" type="button">Tukar nama</button>
+        <span style="display:flex;gap:6px"><button class="btn garis kecil" id="bJam" type="button" title="Tukar format masa">24 jam</button>
+        <button class="btn garis kecil tersembunyi" id="bTukarNama" type="button">Tukar nama</button></span>
       </div>
       <p class="nota" id="jadualNota" style="margin:6px 0 10px"></p>
       <div id="jadualCip" class="jadual-cip"></div>
@@ -400,7 +401,11 @@
   const hariMinggu = t => { const d = new Date(t + "T00:00:00Z").getUTCDay(); return d === 0 ? 7 : d; };
   const minitKini = () => { const d = new Date(Date.now() + 8 * 3600e3); return d.getUTCHours() * 60 + d.getUTCMinutes(); };
   const minit = t => (t ? +t.slice(0, 2) * 60 + +t.slice(3, 5) : null);
-  const jam = t => (t ? t.slice(0, 5) : "");
+  // format masa: 12 jam (lalai) atau 24 jam — pilihan disimpan di telefon
+  let jam24 = (() => { try { return localStorage.getItem("pantas.jam24") === "1"; } catch { return false; } })();
+  const jam = t => { if (!t) return ""; if (jam24) return t.slice(0, 5); const [h, m] = t.slice(0, 5).split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")}`; };
+  const tempoh = t => { const h = +String(t).slice(0, 2); return h < 12 ? "pagi" : h < 13 ? "tgh hari" : "ptg"; };
+  const julat = (a, b) => jam24 ? `${jam(a)}–${jam(b)}` : tempoh(a) === tempoh(b) ? `${jam(a)}–${jam(b)} ${tempoh(b)}` : `${jam(a)} ${tempoh(a)}–${jam(b)} ${tempoh(b)}`;
   const guruSlot = s => String(s.guru_penuh || "").split(" / ").map(x => x.trim()).filter(Boolean);
   const kelasIkutNama = n => semuaKelas.find(k => k.nama === n);
   let jadualHari = [], reliefSaya = [], namaJadual = "", subjekAuto = true, adminJadual = false;
@@ -485,14 +490,14 @@
     const akan = reliefSaya.filter(r => r.tarikh > P.hariIni() && r.guru_ganti === namaJadual);
     $("#reliefAkan").classList.toggle("tersembunyi", !akan.length);
     $("#reliefAkan").innerHTML = akan.length ? `<b>🔔 Relief akan datang</b>` + akan.map(r =>
-      `<div>${P.tarikhCantik(r.tarikh, true)} · W${r.waktu} ${jam(r.mula)}–${jam(r.tamat)} · <b>${P.esc(r.kelas)}</b> ${P.esc(r.subjek || "")} · ganti ${P.esc(P.namaPendek(r.guru_asal))}${r.nota ? ` · <i>${P.esc(r.nota)}</i>` : ""}</div>`).join("") : "";
+      `<div>${P.tarikhCantik(r.tarikh, true)} · W${r.waktu} ${julat(r.mula, r.tamat)} · <b>${P.esc(r.kelas)}</b> ${P.esc(r.subjek || "")} · ganti ${P.esc(P.namaPendek(r.guru_asal))}${r.nota ? ` · <i>${P.esc(r.nota)}</i>` : ""}</div>`).join("") : "";
     $("#jadualNota").innerHTML = blok.length
       ? `${P.esc(namaJadual)} · Tekan kelas untuk isi borang secara automatik.`
       : `${P.esc(namaJadual)} · Tiada kelas dalam jadual hari ini.`;
     $("#jadualCip").innerHTML = blok.map((b, i) => {
       const w = b.awal.waktu === b.akhir.waktu ? `W${b.awal.waktu}` : `W${b.awal.waktu}–${b.akhir.waktu}`;
       const kls = b.slot.includes(kini) ? "kini" : t >= minit(b.akhir.tamat) ? "lepas" : "";
-      return `<button type="button" class="slot ${kls}${b.relief ? " relief" : ""}" data-i="${i}"><small>${w} · ${jam(b.awal.mula)}–${jam(b.akhir.tamat)}</small>
+      return `<button type="button" class="slot ${kls}${b.relief ? " relief" : ""}" data-i="${i}"><small>${w} · ${julat(b.awal.mula, b.akhir.tamat)}</small>
         <b>${P.esc(b.kelas)}</b><small>${P.esc(b.subjek || "")}${b.relief ? ` · ganti ${P.esc(String(b.guru_asal || "").split(" ").slice(0, 2).join(" "))}` : ""}${kls === "kini" ? " · sekarang" : ""}</small></button>`;
     }).join("");
     $("#jadualCip").querySelectorAll(".slot").forEach(el => el.addEventListener("click", () => {
@@ -504,6 +509,11 @@
     }));
     const elKini = $("#jadualCip .slot.kini"); if (elKini) elKini.scrollIntoView({ block: "nearest", inline: "center" });
   }
+  $("#bJam").textContent = jam24 ? "12 jam" : "24 jam";
+  $("#bJam").addEventListener("click", () => {
+    jam24 = !jam24; try { localStorage.setItem("pantas.jam24", jam24 ? "1" : "0"); } catch {}
+    $("#bJam").textContent = jam24 ? "12 jam" : "24 jam"; paparJadual();
+  });
   $("#bTukarNama").addEventListener("click", () => $("#jadualPilih").classList.toggle("tersembunyi"));
   $("#jadualNama").addEventListener("change", async () => {
     if (!adminJadual) return;
@@ -1430,7 +1440,7 @@
     const n = Object.keys(ada).map(Number).sort((a, b) => a - b);
     const pilihan = n.length ? n : Array.from({ length: 12 }, (_, i) => i + 1);
     const sedia = pilih || $("#pkWaktu").value;
-    $("#pkWaktu").innerHTML = pilihan.map(w => `<option value="Waktu ${w}" ${`Waktu ${w}` === sedia ? "selected" : ""}>Waktu ${w}${ada[w] ? ` · ${jam(ada[w].mula)}–${jam(ada[w].tamat)}` : ""}</option>`).join("");
+    $("#pkWaktu").innerHTML = pilihan.map(w => `<option value="Waktu ${w}" ${`Waktu ${w}` === sedia ? "selected" : ""}>Waktu ${w}${ada[w] ? ` · ${julat(ada[w].mula, ada[w].tamat)}` : ""}</option>`).join("");
   }
   function waktuKini(sesi) {
     const t = minitKini(), s = jadualHari.find(x => x.sesi === sesi && minit(x.mula) <= t && t < minit(x.tamat));
