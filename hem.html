@@ -43,6 +43,7 @@
       <button data-v="balik" class="hem">Balik awal</button>
       <button data-v="laporan" class="hem">Laporan</button>
       <button data-v="tetapan" class="hem">Tetapan</button>
+      <button data-v="relief" class="hem">Relief</button>
       <button data-v="profil">Profil murid</button>
     </div>
 
@@ -557,6 +558,7 @@
 
   document.querySelectorAll("#tabUtama button").forEach(b => b.addEventListener("click", () => {
     if (b.dataset.v === "profil") { location.href = "murid.html"; return; }
+    if (b.dataset.v === "relief") { location.href = "relief.html"; return; }
     paparan = b.dataset.v;
     document.querySelectorAll("#tabUtama button").forEach(x => x.classList.toggle("aktif", x === b));
     $("#kTarikh").classList.toggle("tersembunyi", paparan === "laporan");

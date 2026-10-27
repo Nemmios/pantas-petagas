@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ms">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PANTAS Keberadaan Guru</title>
+<meta name="theme-color" content="#1a2433">
+<link rel="icon" href="logo-petagas.png">
+<link rel="stylesheet" href="pantas.css?v=20261027b">
+<style>
+  .pantas-cip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .pantas-cip button { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--garis); background: var(--latar); color: var(--teks); cursor: pointer; }
+  .rl-guru { padding: 10px 0; border-bottom: 1px solid var(--garis); }
+  .rl-guru:last-child { border-bottom: 0; }
+  .rl-guru b { font-size: 14.5px; }
+  .rl-guru.saya { background: var(--emas-lembut); border-radius: 10px; padding: 10px; }
+  .rl-slot { font-size: 13.5px; color: var(--teks-2); margin-top: 3px; }
+  .rl-slot strong { color: var(--teks); }
+</style>
+</head>
+<body>
+<header class="kepala">
+  <a class="ke-utama" href="./" aria-label="Kembali ke halaman utama PANTAS Petagas"><span class="anak-panah">‹</span><img src="logo-petagas.png" alt="">
+  <div class="tajuk"><b>Keberadaan Guru</b><small>Borang keberadaan &amp; jadual relief · SMK Petagas</small></div></a>
+</header>
+
+<main>
+  <div class="tab" id="tabUtama">
+    <button class="aktif" data-v="borang">Borang keberadaan</button>
+    <button data-v="relief">Jadual relief</button>
+    <button data-v="status">Status saya</button>
+  </div>
+
+  <!-- BORANG -->
+  <section id="pBorang">
+    <form id="fBorang" class="kad" autocomplete="off">
+      <h2>Maklumkan keberadaan</h2>
+      <p class="nota">Isi jika anda tidak berada di sekolah atau tidak dapat masuk kelas (CRK, tugas rasmi, mesyuarat, kursus, lawatan dan lain-lain). Pentadbir akan meluluskan, kemudian relief disusun.</p>
+      <label for="nama">Nama</label>
+      <input id="nama" list="senaraiNama" placeholder="Taip nama anda…" required>
+      <datalist id="senaraiNama"></datalist>
+      <div class="baris">
+        <div><label for="mula">Dari tarikh</label><input id="mula" type="date" required></div>
+        <div><label for="akhir">Hingga tarikh</label><input id="akhir" type="date" required></div>
+      </div>
+      <label>Masa</label>
+      <div class="pilihan">
+        <label class="item"><input type="radio" name="masa" value="penuh" checked><span>Sepanjang hari</span></label>
+        <label class="item"><input type="radio" name="masa" value="separuh"><span>Sebahagian hari sahaja<small>Nyatakan masa keluar dan masa kembali</small></span></label>
+      </div>
+      <div id="kMasa" class="baris tersembunyi">
+        <div><label for="masaMula">Dari jam</label><input id="masaMula" type="time" step="300"></div>
+        <div><label for="masaAkhir">Hingga jam</label><input id="masaAkhir" type="time" step="300"></div>
+      </div>
+      <label for="perkara">Perkara</label>
+      <input id="perkara" maxlength="200" placeholder="cth Ujian Bertutur Bahasa Melayu (UBBM) SPM 2026" required>
+      <div class="pantas-cip" id="cipPerkara">
+        <button type="button">CRK</button><button type="button">Cuti sakit</button><button type="button">Tugas rasmi</button>
+        <button type="button">Mesyuarat</button><button type="button">Bengkel / kursus</button><button type="button">Lawatan</button>
+      </div>
+      <label for="tempat">Tempat (pilihan)</label>
+      <input id="tempat" maxlength="120" placeholder="cth SMK Likas">
+      <label for="kebenaran">Catatan kebenaran</label>
+      <input id="kebenaran" maxlength="200" value="Makluman dan kebenaran Pengetua">
+      <div id="mBorang"></div>
+      <button class="btn emas penuh" id="bHantar">Hantar</button>
+    </form>
+    <section id="kSiap" class="kad tersembunyi">
+      <div class="mesej ok" style="margin-top:0"><b>Dihantar.</b> Menunggu kelulusan pentadbir.</div>
+      <p class="nota">Mesej untuk grup Keberadaan Guru (jika masih diperlukan):</p>
+      <textarea id="teksGrup" rows="9" readonly></textarea>
+      <div class="baris" style="margin-top:10px">
+        <button class="btn garis" id="bSalin" type="button">Salin mesej</button>
+        <a class="btn wa" id="bWa" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+      <button class="btn utama penuh" id="bLagi" type="button">Isi borang lain</button>
+    </section>
+  </section>
+
+  <!-- JADUAL RELIEF -->
+  <section id="pRelief" class="tersembunyi">
+    <div class="kad">
+      <div class="baris">
+        <div><label for="rTarikh" style="margin-top:0">Tarikh</label><input id="rTarikh" type="date"></div>
+        <div><label for="rSesi" style="margin-top:0">Sesi</label><select id="rSesi"><option value="">Semua</option><option value="PAGI">Pagi</option><option value="PETANG">Petang</option></select></div>
+      </div>
+      <p class="nota" style="margin:10px 0 0" id="rNota">Nama anda diserlahkan jika anda ada relief.</p>
+    </div>
+    <div class="kad"><div id="rSenarai" class="muat">Memuatkan…</div></div>
+  </section>
+
+  <!-- STATUS -->
+  <section id="pStatus" class="tersembunyi">
+    <div class="kad">
+      <h2>Status borang saya</h2>
+      <p class="nota" id="sNota">Pilih nama anda di tab Borang keberadaan dahulu.</p>
+      <div id="sSenarai"></div>
+    </div>
+  </section>
+</main>
+<footer>BERIMAN · HOLISTIK · BERILMU</footer>
+
+<script src="pantas.js?v=20261027b"></script>
+<script>
+(() => {
+  const P = PANTAS, $ = s => document.querySelector(s);
+  const KUNCI_NAMA = "pantas.namaGuru";
+  const BULAN_PENUH = ["Januari","Februari","Mac","April","Mei","Jun","Julai","Ogos","September","Oktober","November","Disember"];
+  const HARI = ["Ahad","Isnin","Selasa","Rabu","Khamis","Jumaat","Sabtu"];
+  let staf = [];
+  const namaSah = () => { const n = $("#nama").value.trim().toUpperCase(); return staf.find(s => s.nama === n) ? n : null; };
+  const masa12 = t => { if (!t) return ""; let [h, m] = t.slice(0, 5).split(":").map(Number); const ap = h < 12 ? "pagi" : h < 14 ? "tengah hari" : h < 19 ? "petang" : "malam"; return `${((h + 11) % 12) + 1}.${String(m).padStart(2, "0")} ${ap}`; };
+  const tarikhPanjang = iso => { const d = new Date(iso + "T00:00:00Z"); return `${d.getUTCDate()} ${BULAN_PENUH[d.getUTCMonth()]} ${d.getUTCFullYear()}`; };
+  const hariNama = iso => HARI[new Date(iso + "T00:00:00Z").getUTCDay()];
+
+  // tab
+  document.querySelectorAll("#tabUtama button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("#tabUtama button").forEach(x => x.classList.toggle("aktif", x === b));
+    ["borang", "relief", "status"].forEach(v => $("#p" + v[0].toUpperCase() + v.slice(1)).classList.toggle("tersembunyi", v !== b.dataset.v));
+    if (b.dataset.v === "relief") muatRelief();
+    if (b.dataset.v === "status") muatStatus();
+  }));
+
+  // borang
+  const hari = P.hariIni();
+  $("#mula").value = hari; $("#akhir").value = hari; $("#rTarikh").value = hari;
+  $("#mula").addEventListener("change", () => { if ($("#akhir").value < $("#mula").value) $("#akhir").value = $("#mula").value; });
+  document.querySelectorAll('input[name="masa"]').forEach(r => r.addEventListener("change", () =>
+    $("#kMasa").classList.toggle("tersembunyi", document.querySelector('input[name="masa"]:checked').value !== "separuh")));
+  $("#cipPerkara").addEventListener("click", e => { const b = e.target.closest("button"); if (b) { $("#perkara").value = b.textContent; $("#perkara").focus(); } });
+  $("#nama").addEventListener("change", () => { const n = namaSah(); if (n) { $("#nama").value = n; P.simpan.set(KUNCI_NAMA, n); } });
+
+  async function mula() {
+    try {
+      staf = await P.db.rpc("staf_keberadaan") || [];
+      $("#senaraiNama").innerHTML = staf.map(s => `<option value="${P.esc(s.nama)}">`).join("");
+      const n = P.simpan.get(KUNCI_NAMA); if (n && staf.find(s => s.nama === n)) $("#nama").value = n;
+    } catch (e) { $("#mBorang").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
+  }
+
+  function mesejGrup(d) {
+    const tarikh = d.mula === d.akhir ? tarikhPanjang(d.mula) : `${tarikhPanjang(d.mula)} - ${tarikhPanjang(d.akhir)}`;
+    const hariT = d.mula === d.akhir ? hariNama(d.mula) : `${hariNama(d.mula)} - ${hariNama(d.akhir)}`;
+    const tag = "#" + d.nama.split(/\s+(?:BIN|BINTI|BT|A\/L|A\/P|ANAK)\s+/i)[0].split(/\s+/).slice(0, 2)
+        .map(w => w.replace(/[^A-Za-z0-9]/g, "").toLowerCase().replace(/^./, c => c.toUpperCase())).join("") +
+      "\n#" + (() => { const x = new Date(d.mula + "T00:00:00Z"); return `${x.getUTCDate()}${BULAN_PENUH[x.getUTCMonth()]}${x.getUTCFullYear()}`; })();
+    return [`Nama : ${d.nama}`, `Tarikh : ${tarikh}`, `Hari : ${hariT}`, `Perkara : ${d.perkara}`,
+      d.sepanjang ? null : `Masa : ${masa12(d.masaMula)} - ${masa12(d.masaAkhir)}`,
+      d.tempat ? `Tempat : ${d.tempat}` : null, d.kebenaran ? `Catatan : ${d.kebenaran}` : null, "", tag].filter(x => x !== null).join("\n");
+  }
+
+  $("#fBorang").addEventListener("submit", async e => {
+    e.preventDefault();
+    const salah = t => { $("#mBorang").innerHTML = `<div class="mesej ralat">${P.esc(t)}</div>`; };
+    const nama = namaSah(); if (!nama) return salah("Pilih nama anda daripada senarai.");
+    const sepanjang = document.querySelector('input[name="masa"]:checked').value === "penuh";
+    const d = { nama, mula: $("#mula").value, akhir: $("#akhir").value, sepanjang, masaMula: $("#masaMula").value, masaAkhir: $("#masaAkhir").value,
+      perkara: $("#perkara").value.trim(), tempat: $("#tempat").value.trim(), kebenaran: $("#kebenaran").value.trim() };
+    if (!d.mula || !d.akhir) return salah("Pilih tarikh.");
+    if (!sepanjang && (!d.masaMula || !d.masaAkhir || d.masaAkhir <= d.masaMula)) return salah("Nyatakan masa mula dan masa tamat yang betul.");
+    if (d.perkara.length < 3) return salah("Nyatakan perkara.");
+    $("#bHantar").disabled = true; $("#mBorang").innerHTML = "";
+    try {
+      await P.db.rpc("hantar_keberadaan", { p_nama: nama, p_tarikh_mula: d.mula, p_tarikh_akhir: d.akhir, p_sepanjang: sepanjang,
+        p_masa_mula: sepanjang ? null : d.masaMula, p_masa_akhir: sepanjang ? null : d.masaAkhir,
+        p_perkara: d.perkara, p_tempat: d.tempat || null, p_kebenaran: d.kebenaran || null });
+      P.simpan.set(KUNCI_NAMA, nama);
+      const t = mesejGrup(d);
+      $("#teksGrup").value = t; $("#bWa").href = "https://wa.me/?text=" + encodeURIComponent(t);
+      $("#fBorang").classList.add("tersembunyi"); $("#kSiap").classList.remove("tersembunyi");
+    } catch (err) { salah(err.message); }
+    finally { $("#bHantar").disabled = false; }
+  });
+  $("#bSalin").addEventListener("click", () => P.salin($("#teksGrup").value).then(() => P.toast("Mesej disalin")));
+  $("#bLagi").addEventListener("click", () => {
+    $("#perkara").value = ""; $("#tempat").value = "";
+    $("#kSiap").classList.add("tersembunyi"); $("#fBorang").classList.remove("tersembunyi");
+  });
+
+  // jadual relief (awam)
+  async function muatRelief() {
+    const saya = P.simpan.get(KUNCI_NAMA);
+    $("#rSenarai").className = "muat"; $("#rSenarai").textContent = "Memuatkan…";
+    try {
+      const r = (await P.db.rpc("relief_awam", { p_tarikh: $("#rTarikh").value }) || []).filter(x => !$("#rSesi").value || x.sesi === $("#rSesi").value);
+      $("#rSenarai").className = "";
+      if (!r.length) { $("#rSenarai").innerHTML = `<div class="muat">Tiada relief yang diterbitkan untuk ${P.tarikhCantik($("#rTarikh").value, true)}.</div>`; return; }
+      const ikut = {};
+      r.forEach(x => { const k = x.jenis === "RELIEF" ? x.guru_ganti : (x.jenis === "DIBATALKAN" ? "— Dibatalkan" : "— Tiada guru ganti"); (ikut[k] = ikut[k] || []).push(x); });
+      const kunci = Object.keys(ikut).sort((a, b) => (b === saya) - (a === saya) || (a.startsWith("—") - b.startsWith("—")) || a.localeCompare(b));
+      const mineCount = saya && ikut[saya] ? ikut[saya].length : 0;
+      $("#rNota").innerHTML = saya ? (mineCount ? `<b>${P.esc(P.namaPendek(saya))}</b>: anda ada <b>${mineCount}</b> relief.` : `${P.esc(P.namaPendek(saya))}: tiada relief untuk anda.`) : "Pilih nama anda di tab Borang keberadaan untuk diserlahkan.";
+      $("#rSenarai").innerHTML = kunci.map(k => `<div class="rl-guru${k === saya ? " saya" : ""}"><b>${P.esc(k)}</b>` +
+        ikut[k].map(x => `<div class="rl-slot"><strong>W${x.waktu} · ${String(x.mula || "").slice(0, 5)}–${String(x.tamat || "").slice(0, 5)} · ${P.esc(x.kelas)}</strong> ${P.esc(x.subjek || "")} · ganti ${P.esc(P.namaPendek(x.guru_asal))}${x.nota ? ` · <i>${P.esc(x.nota)}</i>` : ""}</div>`).join("") + `</div>`).join("");
+    } catch (e) { $("#rSenarai").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
+  }
+  $("#rTarikh").addEventListener("change", muatRelief); $("#rSesi").addEventListener("change", muatRelief);
+
+  // status saya
+  const STATUS = { MENUNGGU: ["Menunggu kelulusan", "lw"], LULUS: ["Diluluskan", "ok"], DITOLAK: ["Ditolak", "th"], DIBATALKAN: ["Dibatalkan", ""] };
+  async function muatStatus() {
+    const n = P.simpan.get(KUNCI_NAMA);
+    if (!n) { $("#sNota").textContent = "Pilih nama anda di tab Borang keberadaan dahulu."; $("#sSenarai").innerHTML = ""; return; }
+    $("#sNota").textContent = n;
+    try {
+      const r = await P.db.rpc("keberadaan_saya", { p_nama: n }) || [];
+      $("#sSenarai").innerHTML = r.length ? r.map(x => `<div class="murid"><span class="nama"><b>${P.esc(x.perkara)}</b>
+        <small style="color:var(--teks-2)">${P.tarikhCantik(x.tarikh_mula, true)}${x.tarikh_akhir !== x.tarikh_mula ? " – " + P.tarikhCantik(x.tarikh_akhir, true) : ""} · ${x.sepanjang_hari ? "sepanjang hari" : String(x.masa_mula).slice(0, 5) + "–" + String(x.masa_akhir).slice(0, 5)}</small></span>
+        <span class="cip ${STATUS[x.status][1]}">${STATUS[x.status][0]}</span></div>`).join("") : `<div class="muat">Tiada borang dalam 14 hari lepas.</div>`;
+    } catch (e) { $("#sSenarai").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
+  }
+
+  if (new URLSearchParams(location.search).get("v") === "relief") document.querySelector('#tabUtama [data-v="relief"]').click();
+  mula();
+})();
+</script>
+</body>
+</html>
