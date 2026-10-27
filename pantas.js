@@ -99,6 +99,16 @@ const PANTAS = (() => {
     rpc: (fn, arg = {}) => api(`rpc/${fn}`, { method: "POST", body: arg }),
   };
 
+  // ---------- Edge Function ----------
+  async function fungsi(nama, body) {
+    await segarkan();
+    let r;
+    try { r = await fetch(`${URL_SB}/functions/v1/${nama}`, { method: "POST", headers: kepala(), body: JSON.stringify(body) }); }
+    catch (e) { throw new Error(terjemahRalat(e.message)); }
+    if (!r.ok) await bacaRalat(r);
+    return r.json();
+  }
+
   // ---------- Auth (GoTrue) ----------
   const auth = {
     get sesi() { return sesi; },
@@ -257,6 +267,6 @@ const PANTAS = (() => {
     document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
   }
 
-  return { URL_SB, KUNCI, db, auth, q, simpan, hariIni, tambahHari, tarikhCantik, sesiSekarang,
+  return { URL_SB, KUNCI, db, auth, fungsi, q, simpan, hariIni, tambahHari, tarikhCantik, sesiSekarang,
            el, esc, namaPendek, barisTampal, toast, salin, telWa, muatTurunCsv, pautMurid, dialogTukarKata, dialogLupaKata };
 })();

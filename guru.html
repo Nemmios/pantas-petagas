@@ -104,6 +104,12 @@
           <h2 id="tajukKelas" style="margin:0"></h2><span id="status" class="cip"></span>
         </div>
         <p class="nota" style="margin-top:6px">Semua murid dianggap <b>hadir</b>. Tekan <b>TH</b> untuk tidak hadir atau <b>LW</b> untuk lewat.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px">
+          <button class="btn garis kecil" id="bImbas" type="button">📷 Imbas buku kawalan</button>
+          <small style="color:var(--teks-2)">atau tanda sendiri di bawah</small>
+          <input type="file" id="failImbas" accept="image/*" capture="environment" hidden>
+        </div>
+        <div id="kImbas" class="tersembunyi" style="border:1px solid var(--garis);border-radius:12px;padding:12px;margin-bottom:12px"></div>
         <div class="ringkasan" id="ringkasan"></div>
         <div id="mBertindih"></div>
         <div id="senarai"></div>
@@ -307,7 +313,7 @@
 (() => {
   const P = PANTAS, $ = s => document.querySelector(s);
   const PAUTAN_BORANG = new URL("ibubapa.html", location.href).href;
-  let saya = null, semuaKelas = [], murid = [], tanda = {}, asal = {}, sebabIbuBapa = {}, aktivitiMurid = {}, kategoriSemua = [], sebabSemua = [];
+  let saya = null, semuaKelas = [], murid = [], tanda = {}, asal = {}, masaLewat = {}, sebabIbuBapa = {}, aktivitiMurid = {}, kategoriSemua = [], sebabSemua = [];
   // memo aktiviti yang meliputi tarikh (dan waktu) tertentu
   const ambilMemo = (ids, tarikh) => ids.length ? P.db.pilih("memo_murid",
     `select=murid_id,memo:memo_aktiviti!inner(nama,jenis,waktu_mula,waktu_akhir,guru_nama)&murid_id=${inList(ids)}&memo.tarikh_mula=lte.${tarikh}&memo.tarikh_akhir=gte.${tarikh}`) : Promise.resolve([]);
@@ -493,7 +499,7 @@
     $("#senarai").innerHTML = `<div class="muat">Memuatkan…</div>`;
     try {
       murid = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
-      tanda = {}; asal = {}; sebabIbuBapa = {};
+      tanda = {}; asal = {}; masaLewat = {}; sebabIbuBapa = {}; tutupImbas();
       if (murid.length) {
         const ids = inList(murid.map(m => m.id));
         const [hadir, sebab, selesai, memo] = await Promise.all([
@@ -537,6 +543,119 @@
     kemasRingkasan();
   });
 
+  // ---------- imbas buku kawalan ----------
+  const normNama = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ").trim();
+  let imbas = null;   // { baris, murid, jumlah_ditulis, tarikh_ditulis, catatan, pilihan[] }
+  const tutupImbas = () => { imbas = null; const k = $("#kImbas"); if (k) { k.classList.add("tersembunyi"); k.innerHTML = ""; } };
+
+  function kecilkanGambar(fail, maks = 1600) {
+    return new Promise((ok, gagal) => {
+      const img = new Image(), url = URL.createObjectURL(fail);
+      img.onload = () => {
+        const s = Math.min(1, maks / Math.max(img.width, img.height));
+        const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        ok(c.toDataURL("image/jpeg", 0.85).split(",")[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); gagal(new Error("Gambar tidak dapat dibaca.")); };
+      img.src = url;
+    });
+  }
+
+  $("#bImbas").addEventListener("click", () => { $("#failImbas").value = ""; $("#failImbas").click(); });
+  $("#failImbas").addEventListener("change", async () => {
+    const f = $("#failImbas").files[0]; if (!f) return;
+    const kid = +$("#kelas").value; if (!kid) return;
+    const k = $("#kImbas"); k.classList.remove("tersembunyi");
+    k.innerHTML = `<div class="muat">📷 Membaca buku kawalan… (10–20 saat)</div>`;
+    $("#bImbas").disabled = true;
+    try {
+      const gambar = await kecilkanGambar(f);
+      const r = await P.fungsi("imbas-buku-kawalan", { kelas_id: kid, gambar, jenis: "image/jpeg" });
+      imbas = { ...r, pilihan: r.baris.map(b => (b.status === "HIJAU" ? b.murid_id : null)) };
+      lukisImbas();
+    } catch (e) {
+      k.innerHTML = `<div class="mesej ralat" style="margin:0">${P.esc(e.message)}</div>`;
+    } finally { $("#bImbas").disabled = false; }
+  });
+
+  function lukisImbas() {
+    if (!imbas) return;
+    const nama = new Map(imbas.murid.map(m => [m.id, m.nama]));
+    const pendek = id => P.esc(huruf(nama.get(id) || ""));
+    const belum = imbas.baris.filter((b, i) => imbas.pilihan[i] === null).length;
+    const thSet = new Set(), lwSet = new Set();
+    imbas.baris.forEach((b, i) => { const p = imbas.pilihan[i]; if (p && p !== "ABAIKAN") (b.jenis === "LEWAT" ? lwSet : thSet).add(p); });
+    lwSet.forEach(id => thSet.delete(id));
+    const hadir = imbas.murid.length - thSet.size;
+    // amaran
+    const amaran = [];
+    const kiraPilih = {}; imbas.pilihan.forEach(p => { if (p && p !== "ABAIKAN") kiraPilih[p] = (kiraPilih[p] || 0) + 1; });
+    const pendua = Object.keys(kiraPilih).filter(id => kiraPilih[id] > 1 && !(lwSet.has(id)));
+    if (pendua.length) amaran.push(`Murid dipilih lebih daripada sekali: ${pendua.map(pendek).join(", ")}`);
+    if (imbas.jumlah_ditulis) amaran.push(`Angka di buku: <b>${P.esc(imbas.jumlah_ditulis)}</b> · kiraan imbasan: hadir <b>${hadir}</b> (TH ${thSet.size}, LW ${lwSet.size})`);
+    if (imbas.tarikh_ditulis && imbas.tarikh_ditulis !== $("#tarikh").value) amaran.push(`Tarikh di buku (${P.esc(P.tarikhCantik(imbas.tarikh_ditulis, true))}) berbeza dengan tarikh dipilih. Pastikan halaman betul.`);
+    if (imbas.catatan) amaran.push(P.esc(imbas.catatan));
+
+    const baris = imbas.baris.map((b, i) => {
+      const p = imbas.pilihan[i], warna = b.status === "HIJAU" ? "🟢" : b.status === "KUNING" ? "🟡" : "🔴";
+      const jenis = b.jenis === "LEWAT" ? `<span class="cip lw">LW${b.masa ? " " + P.esc(b.masa) : ""}</span>` : `<span class="cip th">TH</span>`;
+      const ditulis = `<small style="color:var(--teks-2)">Ditulis: “${P.esc(b.teks)}”${b.dipangkah ? " (dipangkah)" : ""}</small>`;
+      let isi;
+      if (p) {
+        isi = `<b>${p === "ABAIKAN" ? "<s>Diabaikan</s>" : pendek(p)}</b>${ditulis}
+          <button class="btn garis kecil im-ubah" data-i="${i}" type="button" style="margin-top:6px">Ubah</button>`;
+      } else {
+        const calon = (b.calon || []).map(id => `<button class="btn garis kecil im-pilih" data-i="${i}" data-id="${P.esc(id)}" type="button">${pendek(id)}</button>`).join(" ");
+        const lain = `<select class="im-lain" data-i="${i}"><option value="">— Murid lain dalam kelas ini —</option>${imbas.murid.map(m => `<option value="${P.esc(m.id)}">${P.esc(huruf(m.nama))}</option>`).join("")}</select>`;
+        isi = `<b style="color:var(--oren)">${P.esc(b.sebab || "Sila pilih murid")}</b>${ditulis}
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${calon}
+          <button class="btn garis kecil im-pilih" data-i="${i}" data-id="ABAIKAN" type="button">Bukan murid kelas ini</button></div>${lain}`;
+      }
+      return `<div class="murid" style="align-items:flex-start;flex-wrap:wrap"><span class="no">${warna}</span><span class="nama" style="flex:1">${isi}</span>${jenis}</div>`;
+    }).join("");
+
+    $("#kImbas").innerHTML = `<h3 style="margin:0 0 6px">📷 Hasil imbasan</h3>
+      <div class="ringkasan"><span class="cip th">TH ${thSet.size}</span><span class="cip lw">LW ${lwSet.size}</span><span class="cip ok">Hadir ${hadir}</span>${belum ? `<span class="cip" style="background:var(--emas-lembut)">Perlu jawapan ${belum}</span>` : ""}</div>
+      ${amaran.length ? `<div class="mesej amaran">${amaran.join("<br>")}</div>` : ""}
+      ${imbas.baris.length ? baris : `<div class="muat">Tiada nama dijumpai dalam ruangan tidak hadir.</div>`}
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn utama" id="bGunaImbas" type="button" ${belum || pendua.length ? "disabled" : ""}>Guna keputusan ini</button>
+        <button class="btn garis" id="bBatalImbas" type="button">Batal</button></div>
+      <small style="display:block;margin-top:6px;color:var(--teks-2)">${belum ? "Jawab semua soalan 🟡/🔴 dahulu." : "Selepas ini, semak senarai dan tekan <b>Simpan kehadiran</b>."} Baki imbasan kelas ini hari ini: ${imbas.baki_kelas}.</small>`;
+  }
+
+  $("#kImbas").addEventListener("click", async e => {
+    if (!imbas) return;
+    const t = e.target;
+    if (t.classList.contains("im-pilih")) { imbas.pilihan[+t.dataset.i] = t.dataset.id; imbas.baris[+t.dataset.i].dijawab = true; lukisImbas(); }
+    else if (t.classList.contains("im-ubah")) { const i = +t.dataset.i; imbas.pilihan[i] = null; imbas.baris[i].sebab = "Pilih murid yang betul"; if (!imbas.baris[i].calon.length && imbas.baris[i].murid_id) imbas.baris[i].calon = [imbas.baris[i].murid_id]; lukisImbas(); }
+    else if (t.id === "bBatalImbas") tutupImbas();
+    else if (t.id === "bGunaImbas") gunaImbas();
+  });
+  $("#kImbas").addEventListener("change", e => {
+    const t = e.target; if (!t.classList.contains("im-lain") || !t.value) return;
+    imbas.pilihan[+t.dataset.i] = t.value; imbas.baris[+t.dataset.i].dijawab = true; lukisImbas();
+  });
+
+  async function gunaImbas() {
+    const kid = +$("#kelas").value, ada = new Set(murid.map(m => m.id)), alias = [];
+    imbas.baris.forEach((b, i) => {
+      const p = imbas.pilihan[i]; if (!p || p === "ABAIKAN" || !ada.has(p)) return;
+      if (b.jenis === "LEWAT") { tanda[p] = "LEWAT"; if (b.masa && /^\d{1,2}[:.]\d{2}$/.test(b.masa)) masaLewat[p] = b.masa.replace(".", ":").padStart(5, "0") + ":00"; }
+      else if (tanda[p] !== "LEWAT") tanda[p] = "TIDAK_HADIR";
+      const n = normNama(b.teks);
+      if (b.dijawab && n.length >= 3) alias.push({ kelas_id: kid, teks: n, murid_id: p });
+    });
+    // murid lewat mengatasi TH daripada baris lain
+    imbas.baris.forEach((b, i) => { const p = imbas.pilihan[i]; if (b.jenis === "LEWAT" && p && ada.has(p)) tanda[p] = "LEWAT"; });
+    if (alias.length) { try { await P.db.upsert("alias_murid", alias, "kelas_id,teks"); } catch { /* tidak kritikal */ } }
+    tutupImbas(); lukisSenarai();
+    P.toast("Tanda daripada imbasan dimasukkan. Semak senarai, kemudian tekan Simpan kehadiran.");
+    $("#senarai").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   function kemasRingkasan() {
     const v = Object.values(tanda), th = v.filter(x => x === "TIDAK_HADIR").length, lw = v.filter(x => x === "LEWAT").length;
     $("#ringkasan").innerHTML = `<span class="cip ok">Hadir ${murid.length - th}</span><span class="cip th">Tidak hadir ${th}</span><span class="cip lw">Lewat ${lw}</span><span class="cip">Jumlah ${murid.length}</span>`;
@@ -546,7 +665,7 @@
     const kid = +$("#kelas").value, tarikh = $("#tarikh").value;
     const masa = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(11, 19);
     const ubah = murid.filter(m => tanda[m.id] && tanda[m.id] !== asal[m.id])
-      .map(m => ({ tarikh, murid_id: m.id, status: tanda[m.id], masa_tiba: tanda[m.id] === "LEWAT" ? masa : null, ditanda_oleh: saya.id }));
+      .map(m => ({ tarikh, murid_id: m.id, status: tanda[m.id], masa_tiba: tanda[m.id] === "LEWAT" ? (masaLewat[m.id] || masa) : null, ditanda_oleh: saya.id }));
     const buang = murid.filter(m => asal[m.id] && !tanda[m.id]).map(m => m.id);
     $("#bSimpan").disabled = true;
     try {
