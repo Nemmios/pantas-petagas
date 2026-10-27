@@ -596,12 +596,24 @@
     if (hari > 5) return {};
     if (!cacheJadual[hari]) {
       try {
-        const r = await P.db.pilih("jadual_waktu", `select=kelas,waktu,mula,subjek,guru&hari=eq.${hari}&order=waktu`);
-        const m = {}; r.forEach(s => { if (!m[s.kelas]) m[s.kelas] = s; });
+        const r = await P.db.pilih("jadual_waktu", `select=kelas,waktu,mula,subjek,guru,guru_penuh&hari=eq.${hari}&order=waktu`);
+        const m = {}; r.forEach(s => { if (!m[s.kelas]) m[s.kelas] = [s]; else if (m[s.kelas][0].waktu === s.waktu) m[s.kelas].push(s); });
         cacheJadual[hari] = m;
       } catch { return {}; }
     }
     return cacheJadual[hari];
+  }
+
+  // guru waktu pertama (boleh lebih seorang, cth PI & PM serentak); relief yang disahkan menggantikan guru asal
+  function labelPertama(slot, relief) {
+    return slot.map(g => {
+      const asal = String(g.guru_penuh || "").split(" / ").map(x => x.trim());
+      const r = relief.find(x => x.kelas === g.kelas && x.waktu === g.waktu && asal.includes(x.guru_asal));
+      const nama = P.esc(g.guru || g.subjek), sub = slot.length > 1 ? ` (${P.esc(g.subjek)})` : "";
+      if (r && r.jenis === "RELIEF") return `🔁 ${P.esc(r.guru_ganti)}${sub || ""} relief`;
+      if (r) return `${nama}${sub} tidak hadir · ${r.jenis === "DIBATALKAN" ? "kelas dibatalkan" : "tiada guru ganti"}`;
+      return nama + sub;
+    }).join(" / ");
   }
 
   async function muatKeselamatan() {
@@ -624,7 +636,7 @@
     try {
       const t = $("#tarikh").value;
       const [rekod, selesai, pertama, relief, memo] = await Promise.all([ambilTakHadir(), P.db.pilih("kelas_selesai", `select=kelas_id,pada&tarikh=eq.${t}`),
-        guruWaktuPertama(t), P.db.pilih("relief", `select=kelas,waktu,jenis,guru_ganti&tarikh=eq.${t}&status=eq.SAH`).catch(() => []),
+        guruWaktuPertama(t), P.db.pilih("relief", `select=kelas,waktu,jenis,guru_asal,guru_ganti&tarikh=eq.${t}&status=eq.SAH`).catch(() => []),
         P.db.pilih("memo_aktiviti", `select=nama,jenis,waktu_mula,waktu_akhir,lokasi,guru_nama,memo_murid(count)&tarikh_mula=lte.${t}&tarikh_akhir=gte.${t}&order=jenis,waktu_mula.nullsfirst`).catch(() => [])]);
       $("#harianAktiviti").innerHTML = memo.length ? memo.map(a => `<div class="murid"><span class="nama"><b>${a.jenis === "LUAR" ? "🚌" : "🏃"} ${P.esc(huruf(a.nama))}</b>
         <small style="color:var(--teks-2)">${a.jenis === "LUAR" ? "Luar sekolah" : a.waktu_mula == null ? "Sepanjang hari" : "Waktu " + a.waktu_mula + (a.waktu_akhir !== a.waktu_mula ? "–" + a.waktu_akhir : "")}${a.lokasi ? " · " + P.esc(a.lokasi) : ""} · ${P.esc(P.namaPendek(a.guru_nama || ""))}</small></span>
@@ -642,11 +654,8 @@
         <div class="stat biru"><b>${kira("PERLU_GURU_KELAS") + kira("PERLU_SEMAKAN")}</b><span>Perlu guru kelas</span></div>`;
       $("#gridKelas").innerHTML = kls.map(k => {
         const n = th.filter(r => r.kelas === k.nama).length;
-        const g = pertama[k.nama];
-        const r = g && relief.find(x => x.kelas === k.nama && x.waktu === g.waktu);
-        const siapa = r && r.jenis === "RELIEF" ? `🔁 ${P.esc(r.guru_ganti)} (relief)`
-          : r ? `${P.esc(g.guru || g.subjek)} tidak hadir · ${r.jenis === "DIBATALKAN" ? "kelas dibatalkan" : "tiada guru ganti"}` : P.esc(g.guru || g.subjek);
-        const guru = !siap.has(k.id) && g ? `<small class="guru">W${g.waktu}${g.mula ? " " + g.mula.slice(0, 5) : ""} · ${siapa}</small>` : "";
+        const sl = pertama[k.nama], g = sl && sl[0];
+        const guru = !siap.has(k.id) && g ? `<small class="guru">W${g.waktu}${g.mula ? " " + g.mula.slice(0, 5) : ""} · ${labelPertama(sl, relief)}</small>` : "";
         return `<div class="${siap.has(k.id) ? "siap" : "belum"}">${P.esc(k.nama)}<small>${siap.has(k.id) ? `TH: ${n}` : "Belum ditanda"}</small>${guru}</div>`;
       }).join("");
     } catch (e) { $("#statistik").innerHTML = `<div class="mesej ralat">${P.esc(e.message)}</div>`; }
