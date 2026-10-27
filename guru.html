@@ -113,6 +113,11 @@
         </div>
         <div id="kImbas" class="tersembunyi" style="border:1px solid var(--garis);border-radius:12px;padding:12px;margin-bottom:12px"></div>
         <div class="ringkasan" id="ringkasan"></div>
+        <div id="kotakCari" style="position:sticky;top:0;z-index:5;background:var(--kad, inherit);padding:6px 0 8px;display:flex;gap:6px;align-items:center">
+          <input id="cariMurid" type="text" enterkeyhint="search" placeholder="🔍 Cari nama murid (cth: asma, randy)" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;margin:0">
+          <button class="btn garis kecil tersembunyi" id="bKosongCari" type="button" aria-label="Kosongkan carian">✕</button>
+        </div>
+        <small id="cariBil" style="display:block;color:var(--teks-2);margin:-2px 0 6px"></small>
         <div id="mBertindih"></div>
         <div id="senarai"></div>
         <div class="bar-bawah"><button class="btn utama penuh" id="bSimpan" style="margin-top:0">Simpan kehadiran</button></div>
@@ -501,7 +506,7 @@
     $("#senarai").innerHTML = `<div class="muat">Memuatkan…</div>`;
     try {
       murid = await P.db.pilih("murid", `select=id,nama&kelas_id=eq.${kid}&aktif=is.true&order=nama`);
-      tanda = {}; asal = {}; masaLewat = {}; sebabIbuBapa = {}; tutupImbas();
+      tanda = {}; asal = {}; masaLewat = {}; sebabIbuBapa = {}; tutupImbas(); $("#cariMurid").value = "";
       if (murid.length) {
         const ids = inList(murid.map(m => m.id));
         const [hadir, sebab, selesai, memo] = await Promise.all([
@@ -532,8 +537,35 @@
         <span class="no">${i + 1}</span><span class="nama">${P.esc(m.nama)}${nota}</span>
         <span class="tindakan"><button class="b-th" data-s="TIDAK_HADIR" aria-label="Tidak hadir">TH</button><button class="b-lw" data-s="LEWAT" aria-label="Lewat">LW</button></span></div>`;
     }).join("");
-    kemasRingkasan();
+    kemasRingkasan(); tapisMurid();
   }
+
+  // ---------- cari nama murid (macam "Find in page") ----------
+  const normCari = s => String(s || "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9\s@]/g, " ").replace(/\s+/g, " ").trim();
+  function tapisMurid() {
+    const q = normCari($("#cariMurid").value), kata = q ? q.split(" ") : [];
+    const nama = new Map(murid.map(m => [m.id, normCari(m.nama)]));
+    let n = 0;
+    document.querySelectorAll("#senarai .murid").forEach(row => {
+      const nm = nama.get(row.dataset.id) || "";
+      const ok = !kata.length || kata.every(k => nm.includes(k));
+      row.style.display = ok ? "" : "none"; if (ok) n++;
+    });
+    $("#bKosongCari").classList.toggle("tersembunyi", !q);
+    $("#cariBil").textContent = q ? (n ? `${n} murid sepadan dengan “${$("#cariMurid").value.trim()}”` : "Tiada murid sepadan. Cuba ejaan lain.") : "";
+  }
+  // kotak carian kekal di bawah kepala halaman semasa skrol
+  const letakCari = () => { const k = document.querySelector(".kepala"); $("#kotakCari").style.top = (k ? k.offsetHeight : 0) + "px"; };
+  letakCari(); window.addEventListener("resize", letakCari);
+  $("#cariMurid").addEventListener("input", tapisMurid);
+  $("#cariMurid").addEventListener("keydown", e => {
+    if (e.key === "Enter") {   // Enter: tanda TH jika tinggal seorang
+      e.preventDefault();
+      const nampak = [...document.querySelectorAll("#senarai .murid")].filter(r => r.style.display !== "none");
+      if (nampak.length === 1) nampak[0].querySelector(".b-th").click();
+    }
+  });
+  $("#bKosongCari").addEventListener("click", () => { $("#cariMurid").value = ""; tapisMurid(); $("#cariMurid").focus(); });
 
   $("#senarai").addEventListener("click", e => {
     const b = e.target.closest("button[data-s]"); if (!b) return;
@@ -543,6 +575,7 @@
     row.classList.toggle("th", tanda[id] === "TIDAK_HADIR");
     row.classList.toggle("lw", tanda[id] === "LEWAT");
     kemasRingkasan();
+    if ($("#cariMurid").value.trim()) { const c = $("#cariMurid"); c.focus(); c.select(); }
   });
 
   // ---------- imbas buku kawalan ----------
