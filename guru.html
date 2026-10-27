@@ -105,9 +105,11 @@
         </div>
         <p class="nota" style="margin-top:6px">Semua murid dianggap <b>hadir</b>. Tekan <b>TH</b> untuk tidak hadir atau <b>LW</b> untuk lewat.</p>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0 10px">
-          <button class="btn garis kecil" id="bImbas" type="button">📷 Imbas buku kawalan</button>
+          <button class="btn garis kecil" id="bImbas" type="button">📷 Ambil gambar buku kawalan</button>
+          <button class="btn garis kecil" id="bGaleri" type="button">🖼️ Pilih dari galeri</button>
           <small style="color:var(--teks-2)">atau tanda sendiri di bawah</small>
           <input type="file" id="failImbas" accept="image/*" capture="environment" hidden>
+          <input type="file" id="failGaleri" accept="image/*" hidden>
         </div>
         <div id="kImbas" class="tersembunyi" style="border:1px solid var(--garis);border-radius:12px;padding:12px;margin-bottom:12px"></div>
         <div class="ringkasan" id="ringkasan"></div>
@@ -564,12 +566,15 @@
   }
 
   $("#bImbas").addEventListener("click", () => { $("#failImbas").value = ""; $("#failImbas").click(); });
-  $("#failImbas").addEventListener("change", async () => {
-    const f = $("#failImbas").files[0]; if (!f) return;
+  $("#bGaleri").addEventListener("click", () => { $("#failGaleri").value = ""; $("#failGaleri").click(); });
+  $("#failImbas").addEventListener("change", () => prosesImbas($("#failImbas").files[0]));
+  $("#failGaleri").addEventListener("change", () => prosesImbas($("#failGaleri").files[0]));
+  async function prosesImbas(f) {
+    if (!f) return;
     const kid = +$("#kelas").value; if (!kid) return;
     const k = $("#kImbas"); k.classList.remove("tersembunyi");
     k.innerHTML = `<div class="muat">📷 Membaca buku kawalan… (10–20 saat)</div>`;
-    $("#bImbas").disabled = true;
+    $("#bImbas").disabled = $("#bGaleri").disabled = true;
     try {
       const gambar = await kecilkanGambar(f);
       const r = await P.fungsi("imbas-buku-kawalan", { kelas_id: kid, gambar, jenis: "image/jpeg" });
@@ -577,8 +582,8 @@
       lukisImbas();
     } catch (e) {
       k.innerHTML = `<div class="mesej ralat" style="margin:0">${P.esc(e.message)}</div>`;
-    } finally { $("#bImbas").disabled = false; }
-  });
+    } finally { $("#bImbas").disabled = $("#bGaleri").disabled = false; }
+  }
 
   function lukisImbas() {
     if (!imbas) return;
