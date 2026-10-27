@@ -21,8 +21,31 @@
   tr.ada-amaran { background: var(--merah-lembut); }
   tr.batal td { color: var(--teks-2); }
   .status-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 4px 0 10px; }
-  @media print { .tiada-cetak, select, input, button { display: none !important; } .cetak-sahaja { display: inline !important; } }
-  .cetak-sahaja { display: none; }
+  .masa-rl { display: block; white-space: nowrap; }
+  .cetak-sahaja, .cetak-blok { display: none; }
+  @media print {
+    @page { size: A4 portrait; margin: 10mm 9mm; }
+    .tiada-cetak, select, input, button, .kepala { display: none !important; }
+    .cetak-sahaja { display: inline !important; }
+    .cetak-blok { display: block !important; }
+    main.lebar { padding: 0 !important; max-width: none !important; }
+    #pJana .kad { break-inside: auto !important; border: 0 !important; padding: 0 !important; margin: 0 !important; }
+    #jTajuk { font-size: 15px; margin: 2px 0 4px; }
+    .status-bar { margin: 0 0 6px; gap: 4px; }
+    .status-bar .cip { font-size: 10.5px; padding: 1px 7px; }
+    .jadual-bungkus { overflow: visible !important; }
+    table.rl { font-size: 10.5px; width: 100%; border-collapse: collapse; }
+    table.rl th { font-size: 9.5px; padding: 3px 4px !important; border-bottom: 1.5px solid #000; }
+    table.rl td { padding: 2.5px 4px !important; border-bottom: 1px solid #ccc; line-height: 1.25; }
+    table.rl tr { break-inside: avoid; }
+    table.rl .masa-rl { display: inline; margin-left: 3px; }
+    .info-rl, .amaran-rl { font-size: 9.5px; }
+    tr.ada-amaran { background: none; }
+    .cetak-kepala { border-bottom: 2px solid #000; padding-bottom: 4px; margin-bottom: 6px; font-size: 11px; }
+    .cetak-kepala b { font-size: 13px; letter-spacing: .3px; }
+    .cetak-kaki { margin-top: 18px; font-size: 10.5px; display: flex !important; gap: 30px; }
+    .cetak-kaki div { flex: 1; border-top: 1px solid #000; padding-top: 3px; margin-top: 28px; }
+  }
 </style>
 </head>
 <body>
@@ -94,12 +117,14 @@
         <div class="alat-btn"><button class="btn emas" id="bJana" type="button">⚙️ Jana relief</button></div>
       </div>
       <div class="kad">
+        <div class="cetak-blok cetak-kepala"><b>SMK PETAGAS · JADUAL GURU GANTI (RELIEF)</b></div>
         <h2 id="jTajuk">Relief</h2>
         <div class="status-bar" id="jStatus"></div>
         <div id="jKosong" class="muat">Pilih tarikh dan sesi, kemudian tekan Jana relief.</div>
         <div class="jadual-bungkus"><table class="rl kad-mobile" id="jJadual">
           <thead><tr><th>Waktu</th><th>Kelas</th><th>Subjek</th><th>Tidak hadir</th><th>Guru ganti</th><th>Nota</th></tr></thead>
           <tbody id="jBaris"></tbody></table></div>
+        <div class="cetak-blok cetak-kaki"><div>Disediakan oleh</div><div>Disahkan oleh (Pentadbir)</div></div>
         <div class="baris tiada-cetak" style="margin-top:12px;flex-wrap:wrap">
           <button class="btn garis" id="bSimpanDraf" type="button" disabled>Simpan draf</button>
           <button class="btn utama" id="bSahkan" type="button" disabled>✅ Sahkan &amp; terbitkan</button>
@@ -389,11 +414,11 @@
     $("#jStatus").innerHTML = (statusSimpan === "SAH" ? `<span class="cip ok">Disahkan &amp; diterbitkan</span>` : statusSimpan === "DRAF" ? `<span class="cip lw">Draf (belum diterbitkan)</span>` : baru ? `<span class="cip info">Baru dijana · belum disimpan</span>` : "") +
       (ada ? `<span class="cip">${baris.length} slot</span><span class="cip">${new Set(baris.filter(x => x.guru_ganti).map(x => x.guru_ganti)).size} guru</span>` : "") +
       (nTiada ? `<span class="cip th">${nTiada} tiada guru</span>` : "") + (nAm ? `<span class="cip th">⚠ ${nAm} amaran</span>` : (ada ? `<span class="cip ok">Tiada clash</span>` : "")) +
-      (ctx.lain.length ? `<span class="cip info">Relief sesi lain: ${ctx.lain.length} (disemak)</span>` : "");
+      (ctx.lain.length ? `<span class="cip info tiada-cetak">Relief sesi lain: ${ctx.lain.length} (disemak)</span>` : "");
     $("#jBaris").innerHTML = baris.map((x, i) => {
       const am = amaran(x);
       return `<tr data-i="${i}" class="${am.length ? "ada-amaran" : ""}${x.jenis === "DIBATALKAN" ? " batal" : ""}">
-        <td data-label="Waktu"><b>W${x.w}</b><br><small class="info-rl">${hm(x.a)}–${hm(x.b)}</small></td>
+        <td data-label="Waktu"><b>W${x.w}</b><small class="info-rl masa-rl">${hm(x.a)}–${hm(x.b)}</small></td>
         <td data-label="Kelas">${P.esc(x.kelas)}</td><td data-label="Subjek">${P.esc(x.subj || "")}</td>
         <td data-label="Tidak hadir">${P.esc(P.namaPendek(x.guru_asal))}</td>
         <td data-label="Guru ganti"><select class="rl-pilih">${pilihanGuru(x)}</select>
