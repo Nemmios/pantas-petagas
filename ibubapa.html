@@ -18,7 +18,7 @@
   <!-- LANGKAH 1: pengesahan -->
   <section id="l1" class="kad">
     <h2>Pengesahan ibu bapa / penjaga</h2>
-    <p class="nota">Masukkan No. Kad Pengenalan dan No. Telefon anda seperti yang didaftarkan di sekolah.</p>
+    <p class="nota">Masukkan No. Kad Pengenalan dan No. Telefon bimbit anda. Jika nombor telefon anda sudah bertukar atau belum didaftarkan, masukkan nombor terkini. Guru kelas akan mengesahkannya.</p>
     <form id="fSah" autocomplete="on">
       <label for="ic">No. Kad Pengenalan ibu bapa / penjaga</label>
       <input id="ic" inputmode="numeric" autocomplete="off" placeholder="cth 800101125555" maxlength="14" required>
@@ -32,6 +32,8 @@
 
   <!-- LANGKAH 2: borang sebab -->
   <section id="l2" class="tersembunyi">
+    <div id="notaTel" class="mesej amaran tersembunyi" style="margin:0 0 10px">🟡 <b>No. telefon ini belum ada dalam rekod sekolah.</b><br>
+      Sebab yang anda hantar tetap diterima. Guru kelas akan menghubungi nombor ini untuk pengesahan, dan selepas itu nombor ini akan disimpan sebagai rekod anda.</div>
     <div class="kad">
       <h2>Pilih anak</h2>
       <div id="anak" class="pilihan"></div>
@@ -78,7 +80,7 @@
 (() => {
   const P = PANTAS, $ = s => document.querySelector(s);
   const KUNCI_INGAT = "pantas.penjaga";
-  let ic = "", tel = "", anak = [], kategori = [], sebab = [];
+  let ic = "", tel = "", telSah = true, anak = [], kategori = [], sebab = [];
 
   const tunjuk = id => ["l1", "l2", "l3"].forEach(x => $("#" + x).classList.toggle("tersembunyi", x !== id));
   const mesej = (sel, jenis, teks) => { $(sel).innerHTML = teks ? `<div class="mesej ${jenis}">${P.esc(teks)}</div>` : ""; };
@@ -136,13 +138,14 @@
   async function sahkan(i, t, senyap) {
     $("#bSah").disabled = true; mesej("#m1");
     try {
-      const r = await P.db.rpc("semak_penjaga", { p_ic: i, p_tel: t });
+      const r = await P.db.rpc("semak_penjaga_gabungan", { p_ic: i, p_tel: t });
       if (!r || !r.length) {
         if (senyap) { P.simpan.del(KUNCI_INGAT); return; }
-        mesej("#m1", "ralat", "Maklumat tidak sepadan dengan rekod sekolah. Pastikan No. KP dan No. Telefon betul, atau hubungi guru kelas untuk kemas kini nombor telefon.");
+        mesej("#m1", "ralat", "No. Kad Pengenalan ini tidak dijumpai dalam rekod sekolah. Pastikan nombor betul (tanpa sengkang), atau hubungi guru kelas.");
         return;
       }
-      ic = i; tel = t; anak = r;
+      ic = i; tel = t; anak = r; telSah = r[0].tel_sah !== false;
+      $("#notaTel").classList.toggle("tersembunyi", telSah);
       if ($("#ingat").checked || senyap) P.simpan.set(KUNCI_INGAT, { ic, tel });
       $("#anak").innerHTML = anak.map((a, n) => `
         <label class="item"><input type="radio" name="anak" value="${P.esc(a.murid_id)}" ${anak.length === 1 || n === 0 ? "checked" : ""}>
@@ -176,8 +179,8 @@
     try {
       const asas = { p_ic: ic, p_tel: tel, p_murid_id: pilih.value, p_tarikh_mula: $("#mula").value, p_tarikh_akhir: $("#akhir").value,
         p_catatan: $("#catatan").value.trim() || null };
-      const id = isu ? await P.db.rpc("hantar_isu_keselamatan", asas)
-        : await P.db.rpc("hantar_sebab", { ...asas, p_sebab_id: sebabId, p_minta_jumpa: jumpa });
+      const id = isu ? await P.db.rpc("hantar_isu_keselamatan_gabungan", asas)
+        : await P.db.rpc("hantar_sebab_gabungan", { ...asas, p_sebab_id: sebabId, p_minta_jumpa: jumpa });
       if (!id) { mesej("#m2", "ralat", "Pengesahan gagal. Sila mulakan semula."); return; }
       const a = anak.find(x => x.murid_id === pilih.value);
       const s = sebab.find(x => x.id === sebabId);
@@ -187,7 +190,8 @@
         <tr><th>Murid</th><td>${P.esc(a.nama)}<br><small>${P.esc(a.kelas)}</small></td></tr>
         <tr><th>Tarikh</th><td>${P.esc(tempoh)}</td></tr>
         <tr><th>Sebab</th><td>${isu ? "Isu keselamatan — guru kelas akan menghubungi anda" : jumpa ? "Ingin berbincang dengan guru kelas" : P.esc(huruf(s.nama))}</td></tr>
-        <tr><th>No. rujukan</th><td>#${id}</td></tr></tbody></table>`;
+        <tr><th>No. rujukan</th><td>#${id}</td></tr>
+        ${telSah ? "" : `<tr><th>Status</th><td>🟡 Diterima · menunggu pengesahan guru kelas melalui no. ${P.esc(tel)}</td></tr>`}</tbody></table>`;
       tunjuk("l3"); window.scrollTo(0, 0);
     } catch (e) { mesej("#m2", "ralat", e.message); }
     finally { $("#bHantar").disabled = false; }
@@ -200,7 +204,7 @@
     tunjuk("l2");
   });
   $("#bTukar").addEventListener("click", () => {
-    P.simpan.del(KUNCI_INGAT); ic = tel = ""; $("#ic").value = $("#tel").value = ""; $("#ingat").checked = false; tunjuk("l1");
+    P.simpan.del(KUNCI_INGAT); ic = tel = ""; telSah = true; $("#notaTel").classList.add("tersembunyi"); $("#ic").value = $("#tel").value = ""; $("#ingat").checked = false; tunjuk("l1");
   });
 
   // auto masuk jika diingati
