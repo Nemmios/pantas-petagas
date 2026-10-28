@@ -155,6 +155,8 @@
       </div>
       <div class="kad">
         <h2 id="tajukKelasku">Kelas saya</h2>
+        <div id="kkPilihBox" class="tersembunyi" style="margin-bottom:8px"><label for="kkPilih" style="margin-top:0">Kelas</label><select id="kkPilih"></select>
+          <small style="display:block;color:var(--teks-2);margin-top:4px">HEM, disiplin &amp; kaunseling boleh rekod sebab murid mana-mana kelas.</small></div>
         <p class="nota">Murid tidak hadir dalam 14 hari lepas yang perlu tindakan guru kelas. Tekan nama murid untuk lihat profil penuh.</p>
         <a class="btn garis kecil" href="murid.html" style="margin-bottom:10px">👤 Profil murid kelas saya</a>
         <div class="ringkasan" id="ringkasKelasku"></div>
@@ -389,6 +391,15 @@
     $("#sesi").value = kAwal ? kAwal.sesi : P.sesiSekarang();
     isiKelas(kAwal ? kAwal.id : "");
     if (saya.kelas_id) { $("#tKelasku").classList.remove("tersembunyi"); $("#tajukKelasku").textContent = `Kelas saya: ${kSaya ? kSaya.nama : ""}`; }
+    // HEM / Admin / Petugas (cth guru disiplin, kaunseling): boleh rekod sebab untuk mana-mana kelas
+    if (["HEM", "ADMIN", "PETUGAS"].includes(saya.peranan)) {
+      $("#tKelasku").classList.remove("tersembunyi");
+      if (!saya.kelas_id) { $("#tKelasku").textContent = "Sebab murid"; $("#tajukKelasku").textContent = "Sebab tidak hadir murid"; }
+      $("#kkPilihBox").classList.remove("tersembunyi");
+      $("#kkPilih").innerHTML = `<option value="">— Pilih kelas —</option>` + semuaKelas.map(k => `<option value="${k.id}" ${k.id === saya.kelas_id ? "selected" : ""}>${P.esc(k.nama)}</option>`).join("");
+      $("#kkPilih").addEventListener("change", () => { kelasDipilih = +$("#kkPilih").value || null; muatKelasku(); });
+    }
+    if (!saya.kelas_id) { const kt = document.querySelector("#pKelasku > .kad"); if (kt) kt.classList.add("tersembunyi"); }
     if (kAwal) muatSenarai();
     semakInbox();
   }
@@ -1276,8 +1287,12 @@
     finally { b.disabled = false; }
   });
 
+  let kelasDipilih = null;
   async function muatKelasku() {
-    const k = semuaKelas.find(x => x.id === saya.kelas_id); if (!k) return;
+    if (kelasDipilih == null) kelasDipilih = saya.kelas_id || null;
+    const k = semuaKelas.find(x => x.id === kelasDipilih);
+    if (!k) { $("#ringkasKelasku").innerHTML = ""; $("#senaraiKelasku").className = "muat"; $("#senaraiKelasku").textContent = "Pilih kelas."; $("#pontengKelasku").innerHTML = ""; return; }
+    const kelasSendiri = k.id === saya.kelas_id;
     if (!$("#tpTarikh").value) { $("#tpTarikh").value = P.hariIni(); $("#tpTarikh").max = P.hariIni(); }
     ringkasTampal();
     const dari = P.tambahHari(P.hariIni(), -14);
@@ -1304,7 +1319,7 @@
           : r.keadaan === "PERLU_GURU_KELAS" ? `<span class="cip lw">Ibu bapa minta berbincang</span>` : `<span class="cip info">Perlu semakan</span>`;
         const wa = (tel[r.murid_id] || []).map(p => {
           const t = `Salam sejahtera ${p.hubungan ? huruf(p.hubungan) : "tuan/puan"}. Untuk makluman, ${r.murid} (${r.kelas}) tidak hadir ke sekolah pada ${P.tarikhCantik(r.tarikh, true)}. ` +
-            `Mohon maklumkan sebab melalui pautan ini: ${PAUTAN_BORANG}\n\nTerima kasih.\nGuru Kelas ${r.kelas}, SMK Petagas`;
+            `Mohon maklumkan sebab melalui pautan ini: ${PAUTAN_BORANG}\n\nTerima kasih.\n${kelasSendiri ? `Guru Kelas ${r.kelas}` : huruf(saya.nama)}, SMK Petagas`;
           return `<a class="btn wa kecil wa-log" data-hub="${P.esc(p.hubungan || "penjaga")}" target="_blank" rel="noopener" href="https://wa.me/${P.telWa(p.telefon)}?text=${encodeURIComponent(t)}">WhatsApp ${P.esc(huruf(p.hubungan || "penjaga"))}</a>`;
         }).join(" ") || `<span class="cip">Tiada no. telefon</span>`;
         return `<div class="murid" style="flex-wrap:wrap" data-id="${P.esc(r.murid_id)}" data-tarikh="${r.tarikh}">
