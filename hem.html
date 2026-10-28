@@ -655,7 +655,7 @@
         <div class="stat merah"><b>${th.length}</b><span>Tidak hadir</span></div>
         <div class="stat oren"><b>${rekod.length - th.length}</b><span>Lewat</span></div>
         <div class="stat hijau"><b>${kira("ADA_SEBAB")}</b><span>Ada sebab</span></div>
-        <div class="stat merah"><b>${kira("BELUM_ADA_SEBAB")}</b><span>Belum ada sebab</span></div>
+        <a class="stat merah" href="guru.html?v=kelasku" style="text-decoration:none;color:inherit"><b>${kira("BELUM_ADA_SEBAB")}</b><span>Belum ada sebab · <u>✏️ Rekod sebab</u></span></a>
         <div class="stat biru"><b>${kira("PERLU_GURU_KELAS") + kira("PERLU_SEMAKAN")}</b><span>Perlu guru kelas</span></div>`;
       $("#gridKelas").innerHTML = kls.map(k => {
         const n = th.filter(r => r.kelas === k.nama).length;

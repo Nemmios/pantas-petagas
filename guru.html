@@ -400,6 +400,8 @@
       $("#kkPilih").addEventListener("change", () => { kelasDipilih = +$("#kkPilih").value || null; muatKelasku(); });
     }
     if (!saya.kelas_id) { const kt = document.querySelector("#pKelasku > .kad"); if (kt) kt.classList.add("tersembunyi"); }
+    // pautan terus dari HEM: guru.html?v=kelasku
+    if (new URLSearchParams(location.search).get("v") === "kelasku" && !$("#tKelasku").classList.contains("tersembunyi")) $("#tKelasku").click();
     if (kAwal) muatSenarai();
     semakInbox();
   }
